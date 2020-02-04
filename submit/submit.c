@@ -48,7 +48,7 @@ int try_submit_file(const char *f_name, const char *submit_path) {
     }
 
     printf(
-        "    [+] Submitted: %s (%i bytes)\n",
+        "    [+] Submitted: %s (%li bytes)\n",
         f_name,
         sendfile(o_fd, i_fd, NULL, f_size));
 
