@@ -124,7 +124,7 @@ result_t try_submit_file(const std::string & f_name, const std::string & submit_
         std::cerr << "    [!] Error: " << f_name << ", failed to copy file\n";
         return result_t::fail;
     } else {
-        std::cout << "    [i] Submitted: " << f_name << " (" << submitted_size << " bytes)\n";
+        std::cout << "    [-] Submitted: " << f_name << " (" << submitted_size << " bytes)\n";
         return result_t::success;
     }
 }
@@ -200,7 +200,7 @@ int main(int argc, char *argv[]) {
     std::cout << "[i] Submitting for " << user_name << ".\n";
 
     if(submit::create_dir(user_submit_path) == submit::create_dir_result_t::fail) {
-        std::cerr << "[!] Failed to create user dir.\n";
+        std::cerr << "[!] Error: Failed to create user dir.\n";
         return 1;
     }
 
@@ -234,11 +234,17 @@ int main(int argc, char *argv[]) {
     }
 #elif defined(SINGLE)
     if(submit::try_submit_file(STR(SINGLE), user_submit_num_path) == submit::result_t:fail) {
-        std::cerr << "[!] Failed to submit assignment.\n";
+        std::cerr << "[!] Error: Failed to submit assignment.\n";
         return 1;
     }
     submission_count++;
 #endif
+
+    if(submission_count == 0) {
+        std::cerr << "[!] Error: No files to submit.\n";
+        (void) rmdir(user_submit_num_path.c_str());
+        return 1;
+    }
 
     std::cout << "[i] Completed submission of " << submission_count << " files:\n";
     submit::print_files_in_dir(user_submit_num_path);
