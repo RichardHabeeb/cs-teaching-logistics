@@ -40,6 +40,7 @@ enum class create_dir_result_t { created, exists, fail };
  * CONSTANTS
  ******************************************************************************/
 static const std::string path_prefix("/c/cs323/Hwk" STR(HWK) "/.submit");
+static const std::string home_prefix("/home/accts");
 
 
 /******************************************************************************
@@ -173,7 +174,92 @@ void print_files_in_dir(const std::string &path) {
 }
 
 
+void zip_folder_unsafe(const std::string &path, const std::string &output_name) {
+    std::string command = "zip -qrj " + output_name + " " + path;
+
+    system(command.c_str());
+}
+
+void rm_dir_recursive_unsafe(const std::string &path) {
+    std::string command = "rm -r " + path;
+
+    system(command.c_str());
+}
+
+
+int next_submission_number(const std::string &user_submit_path) {
+    int sub_num = 0;
+    std::string user_submit_num_path;
+    do {
+        user_submit_num_path = user_submit_path + "/" + std::to_string(sub_num);
+
+        DIR* dir = opendir(user_submit_num_path.c_str());
+        if (dir) {
+            closedir(dir);
+        } else if (ENOENT == errno) {
+            return sub_num;
+        }
+
+        ++sub_num;
+    } while(1);
+}
+
+
+result_t do_submission(const std::string &user_name, const std::string &user_submit_path) {
+
+    std::cout << "[i] Submitting for " << user_name << ".\n";
+
+    /* CREATE SUBMISSION NUM FOLDER */
+    int sub_num = next_submission_number(user_submit_path);
+    std::string user_submit_num_path = user_submit_path + "/" + std::to_string(sub_num);
+
+    std::cout << "[i] Creating submission #" << sub_num << "\n";
+    if(create_dir(user_submit_num_path) != create_dir_result_t::created) {
+        std::cerr << "[!] Error: Failed to create submission dir.\n";
+        return result_t::fail;
+    }
+
+    int submission_count = 0;
+
+#if defined(ALL)
+    DIR* current_dir = opendir(".");
+    struct dirent *current_dir_entry;
+    while(current_dir != NULL && (current_dir_entry = readdir(current_dir)) != NULL) {
+        if(try_submit_file(
+                std::string(current_dir_entry->d_name),
+                user_submit_num_path) == result_t::success) {
+            submission_count++;
+        }
+    }
+#elif defined(SINGLE)
+    if(try_submit_file(STR(SINGLE), user_submit_num_path) == result_t:fail) {
+        std::cerr << "[!] Error: Failed to submit assignment.\n";
+        return result_t::fail;
+    }
+    submission_count++;
+#endif
+
+    if(submission_count == 0) {
+        std::cerr << "[!] Error: No files to submit.\n";
+        (void) rmdir(user_submit_num_path.c_str());
+        return result_t::fail;
+    }
+
+    std::cout << "[i] Completed submission of " << submission_count << " files:\n";
+    print_files_in_dir(user_submit_num_path);
+
+    return result_t::success;
+}
+
+
+
+
+
+
+
+
 } /* namespace submit */
+
 
 int main(int argc, char *argv[]) {
     std::cout <<
@@ -197,57 +283,54 @@ int main(int argc, char *argv[]) {
     std::string user_name = submit::get_user();
     std::string user_submit_path = submit::path_prefix + "/" + user_name;
 
-    std::cout << "[i] Submitting for " << user_name << ".\n";
-
     if(submit::create_dir(user_submit_path) == submit::create_dir_result_t::fail) {
         std::cerr << "[!] Error: Failed to create user dir.\n";
         return 1;
     }
 
 
-    /* CREATE SUBMISSION NUM FOLDER */
-    std::string user_submit_num_path;
-    int sub_num = 0;
-    do {
-        user_submit_num_path = user_submit_path + "/" + std::to_string(sub_num);
-
-        if(submit::create_dir(user_submit_num_path) == submit::create_dir_result_t::created) {
-            std::cout << "[i] Creating submission #" << sub_num << "\n";
-            break;
+    if(argc > 1 && std::string(argv[1]) == "info") {
+        int sub_num;
+        if(argc == 3) {
+            sub_num = std::max(0, std::stoi(std::string(argv[2])));
+        } else {
+            sub_num = std::max(0, submit::next_submission_number(user_submit_path) - 1);
         }
 
-        ++sub_num;
-    } while(1);
+        std::string user_submit_num_path = user_submit_path + "/" + std::to_string(sub_num);
 
+        std::cout << "[i] Information about submission #" << sub_num << " from " << user_name << ".\n";
+        std::cout << "[i] Files submitted:\n";
+        submit::print_files_in_dir(user_submit_num_path);
 
-    int submission_count = 0;
+    } else if(argc > 1 && std::string(argv[1]) == "get") {
+        int sub_num;
+        if(argc == 3) {
+            sub_num = std::max(0, std::stoi(std::string(argv[2])));
+        } else {
+            sub_num = std::max(0, submit::next_submission_number(user_submit_path) - 1);
+        }
 
-#if defined(ALL)
-    DIR* current_dir = opendir(".");
-    struct dirent *current_dir_entry;
-    while(current_dir != NULL && (current_dir_entry = readdir(current_dir)) != NULL) {
-        if(submit::try_submit_file(
-                std::string(current_dir_entry->d_name),
-                user_submit_num_path) == submit::result_t::success) {
-            submission_count++;
+        std::string user_submit_num_path = user_submit_path + "/" + std::to_string(sub_num);
+        std::string dest_path = submit::home_prefix + "/" + user_name +
+            "/hwk" STR(HWK) "-" + std::to_string(sub_num) + ".zip";
+
+        if(access(dest_path.c_str(), F_OK) != -1) {
+            std::cerr << "[!] File already exists: " << dest_path << "\n";
+            return 1;
+        }
+
+        submit::zip_folder_unsafe(user_submit_num_path + "/*", dest_path);
+
+        std::cout << "[i] Retrieved submitted files to " << dest_path << "\n";
+
+    } else {
+        if(submit::do_submission(user_name, user_submit_path) == submit::result_t::fail) {
+            return 1;
         }
     }
-#elif defined(SINGLE)
-    if(submit::try_submit_file(STR(SINGLE), user_submit_num_path) == submit::result_t:fail) {
-        std::cerr << "[!] Error: Failed to submit assignment.\n";
-        return 1;
-    }
-    submission_count++;
-#endif
 
-    if(submission_count == 0) {
-        std::cerr << "[!] Error: No files to submit.\n";
-        (void) rmdir(user_submit_num_path.c_str());
-        return 1;
-    }
 
-    std::cout << "[i] Completed submission of " << submission_count << " files:\n";
-    submit::print_files_in_dir(user_submit_num_path);
 
     return 0;
 }
