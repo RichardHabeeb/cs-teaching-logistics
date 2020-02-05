@@ -2,10 +2,10 @@ cc_binary(
     name = "submit",
     deps = [],
     srcs = [
-        "submit.c",
+        "submit.cpp",
     ],
     defines = [
         "ALL",
-        "HWK=1"
+        "HWK=4"
     ],
 )
