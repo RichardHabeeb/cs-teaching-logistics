@@ -124,6 +124,10 @@ int main(int argc, char *argv[]) {
 	fprintf(stderr, RED "Error! Could not find a bomb for you! Please contact TF Karthik Sriram with your netid\n" RESET);
 	exit(1);
     }
+    if(!bomb_ptr){
+	fprintf(stderr, RED "Error! Could not find a bomb for you! Please contact TF Karthik Sriram with your netid\n" RESET);
+	exit(1);
+    }
     char * bomb;
     asprintf(&bomb, "%s/%s", bomb_path, bomb_ptr->d_name);
 
