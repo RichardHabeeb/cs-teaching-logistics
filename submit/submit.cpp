@@ -4,11 +4,12 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/sendfile.h>
+#include <iostream>
+#include <iomanip>
 #include <cerrno>
 #include <cstdio>
 #include <vector>
 #include <string>
-#include <iostream>
 
 /******************************************************************************
  * MACROS AND DEFINITIONS
@@ -20,6 +21,7 @@
 #if !(defined(ALL) || defined(SINGLE))
 #error *** Need to define a submission style ***
 #endif
+
 
 #define STR_HELPER(x) #x
 #define STR(x) STR_HELPER(x)
@@ -79,6 +81,15 @@ off_t get_regular_file_size(const std::string & f_name) {
     }
     return -1;
 }
+
+time_t get_modified_time_sec(const std::string &path) {
+    struct stat info;
+    if(stat(path.c_str(), &info) != -1) {
+        return info.st_mtim.tv_sec;
+    }
+    return 0;
+}
+
 
 result_t try_submit_file(const std::string & f_name, const std::string & submit_path) {
     off_t f_size = get_regular_file_size(f_name);
@@ -144,6 +155,24 @@ create_dir_result_t create_dir(const std::string &path) {
 }
 
 
+
+void print_files_in_dir(const std::string &path) {
+    DIR* current_dir = opendir(path.c_str());
+    struct dirent *current_dir_entry;
+    while(current_dir != NULL && (current_dir_entry = readdir(current_dir)) != NULL) {
+        std::string f_name(current_dir_entry->d_name);
+
+        off_t f_size = get_regular_file_size(f_name);
+        time_t mod_time = get_modified_time_sec(f_name);
+
+        if(f_size == -1) continue;
+
+        std::cout << "    [-] " << f_name <<
+            std::put_time(std::localtime(&mod_time), " (modified: %b %e %I:%M %p)") << "\n";
+    }
+}
+
+
 } /* namespace submit */
 
 int main(int argc, char *argv[]) {
@@ -154,11 +183,14 @@ int main(int argc, char *argv[]) {
         " submission tool\n"
         "\n"
 #if defined(ALL)
-        "[i] This tool will submit all of the files \n"
+        "[i] This tool will submit ALL of the files \n"
 #elif defined(SINGLE)
         "[i] This tool will submit your " STR(SINGLE) " file \n"
 #endif
-        "    in the current directory for your project.\n";
+        "    in the current directory for your project.\n"
+        "    You may submit any number of times, and \n"
+        "    more intermediate submissions are\n"
+        "    encouraged.\n";
 
 
     /* CREATE USER FOLDER */
@@ -171,6 +203,7 @@ int main(int argc, char *argv[]) {
         std::cerr << "[!] Failed to create user dir.\n";
         return 1;
     }
+
 
     /* CREATE SUBMISSION NUM FOLDER */
     std::string user_submit_num_path;
@@ -187,18 +220,28 @@ int main(int argc, char *argv[]) {
     } while(1);
 
 
+    int submission_count = 0;
+
 #if defined(ALL)
     DIR* current_dir = opendir(".");
     struct dirent *current_dir_entry;
     while(current_dir != NULL && (current_dir_entry = readdir(current_dir)) != NULL) {
-        submit::try_submit_file(std::string(current_dir_entry->d_name), user_submit_num_path);
+        if(submit::try_submit_file(
+                std::string(current_dir_entry->d_name),
+                user_submit_num_path) == submit::result_t::success) {
+            submission_count++;
+        }
     }
 #elif defined(SINGLE)
     if(submit::try_submit_file(STR(SINGLE), user_submit_num_path) == submit::result_t:fail) {
         std::cerr << "[!] Failed to submit assignment.\n";
+        return 1;
     }
+    submission_count++;
 #endif
 
+    std::cout << "[i] Completed submission of " << submission_count << " files:\n";
+    submit::print_files_in_dir(user_submit_num_path);
 
     return 0;
 }
