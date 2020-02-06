@@ -59,6 +59,7 @@ bool is_file_allowed(const std::string & f_name) {
     };
 
     for(auto it = disallowed_suffix.begin(); it != disallowed_suffix.end(); ++it) {
+        if((*it).size() > f_name.size()) continue;
         if(f_name.compare(f_name.size()-(*it).size(), (*it).size(), (*it)) == 0) {
             return false;
         }
@@ -131,6 +132,32 @@ result_t try_submit_file(const std::string & f_name, const std::string & submit_
 }
 
 
+off_t try_copy_file(const std::string &src_path, const std::string &dst_path) {
+
+    off_t f_size = get_regular_file_size(src_path.c_str());
+
+    if(f_size < 0) {
+        return -1;
+    }
+
+    int i_fd = open(src_path.c_str(),
+            O_RDONLY);
+    int o_fd = open(dst_path.c_str(),
+            O_CREAT|O_WRONLY|O_TRUNC,
+            S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH);
+    if(i_fd == -1 || o_fd == -1) {
+        return -1;
+    }
+
+    auto submitted_size = sendfile(o_fd, i_fd, NULL, f_size);
+
+    close(i_fd);
+    close(o_fd);
+
+    return submitted_size;
+}
+
+
 
 std::string get_user() {
     char login_name[64];
@@ -146,8 +173,7 @@ create_dir_result_t create_dir(const std::string &path) {
     if (dir) {
         closedir(dir);
         return create_dir_result_t::exists;
-    } else if (ENOENT == errno) {
-        mkdir(path.c_str(), S_IRWXU | S_IRWXG);
+    } else if (ENOENT == errno && mkdir(path.c_str(), S_IRWXU | S_IRWXG) == 0) {
         return create_dir_result_t::created;
     } else {
         return create_dir_result_t::fail;
@@ -163,27 +189,18 @@ void print_files_in_dir(const std::string &path) {
     while(current_dir != NULL && (current_dir_entry = readdir(current_dir)) != NULL) {
         std::string f_name(current_dir_entry->d_name);
 
-        off_t f_size = get_regular_file_size(f_name);
-        time_t mod_time = get_modified_time_sec(f_name);
+        off_t f_size = get_regular_file_size(path + "/" + f_name);
+        time_t mod_time = get_modified_time_sec(path + "/" + f_name);
 
         if(f_size == -1) continue;
 
         std::cout << "    [-] " << f_name <<
-            std::put_time(std::localtime(&mod_time), " (modified: %b %e %I:%M %p)") << "\n";
+            std::put_time(std::localtime(&mod_time), " (submitted on: %b %e %I:%M %p)") << "\n";
     }
-}
 
-
-void zip_folder_unsafe(const std::string &path, const std::string &output_name) {
-    std::string command = "zip -qrj " + output_name + " " + path;
-
-    system(command.c_str());
-}
-
-void rm_dir_recursive_unsafe(const std::string &path) {
-    std::string command = "rm -r " + path;
-
-    system(command.c_str());
+    if(current_dir == NULL) {
+        std::cerr << "[!] Failed to access directory (" << errno << ")\n";
+    }
 }
 
 
@@ -232,7 +249,7 @@ result_t do_submission(const std::string &user_name, const std::string &user_sub
         }
     }
 #elif defined(SINGLE)
-    if(try_submit_file(STR(SINGLE), user_submit_num_path) == result_t:fail) {
+    if(try_submit_file(STR(SINGLE), user_submit_num_path) == result_t::fail) {
         std::cerr << "[!] Error: Failed to submit assignment.\n";
         return result_t::fail;
     }
@@ -252,10 +269,34 @@ result_t do_submission(const std::string &user_name, const std::string &user_sub
 }
 
 
+result_t do_retrieval(const std::string &user_name, const std::string &user_submit_path, int sub_num) {
+    std::string user_submit_num_path = user_submit_path + "/" + std::to_string(sub_num);
+    std::string home_dir_dst = home_prefix + "/" + user_name + "/retrieved-Hwk1-sub-" + std::to_string(sub_num);
 
+    std::cout << "[i] Creating retrieval folder: " << home_dir_dst << "\n";
+    if(create_dir(home_dir_dst) != create_dir_result_t::created) {
+        std::cerr << "[!] Error: Failed to create retrieval dir, check to see if it already exists.\n";
+        return result_t::fail;
+    }
+    (void) chown(home_dir_dst.c_str(), getuid(), getuid());
 
+    DIR* current_dir = opendir(user_submit_num_path.c_str());
+    struct dirent *current_dir_entry;
+    while(current_dir != NULL && (current_dir_entry = readdir(current_dir)) != NULL) {
 
+        off_t size = try_copy_file(
+                user_submit_num_path + "/" + current_dir_entry->d_name,
+                home_dir_dst + "/" + current_dir_entry->d_name);
 
+        if(size != -1) {
+            std::cout << "    [-] Retrieved: " << current_dir_entry->d_name << "\n";
+            (void) chown((home_dir_dst + "/" + current_dir_entry->d_name).c_str(), getuid(), getuid());
+        }
+    }
+
+    if(current_dir == NULL) return result_t::fail;
+    return result_t::success;
+}
 
 
 } /* namespace submit */
@@ -276,7 +317,12 @@ int main(int argc, char *argv[]) {
         "    in the current directory for your project.\n"
         "    You may submit any number of times, and \n"
         "    more intermediate submissions are\n"
-        "    encouraged.\n";
+        "    encouraged.\n"
+        "[i] usage: /c/cs323/Hwk" STR(HWK) "/submit [info|get [N]]\n"
+        "    [-] info will list the files submitted for\n"
+        "        the Nth or latest submission\n"
+        "    [-] get will retrieve the files submitted\n"
+        "        for the Nth or latest submission.\n";
 
 
     /* CREATE USER FOLDER */
@@ -320,9 +366,10 @@ int main(int argc, char *argv[]) {
             return 1;
         }
 
-        submit::zip_folder_unsafe(user_submit_num_path + "/*", dest_path);
+        if(submit::do_retrieval(user_name, user_submit_path, sub_num) == submit::result_t::fail) {
+            return 1;
+        }
 
-        std::cout << "[i] Retrieved submitted files to " << dest_path << "\n";
 
     } else {
         if(submit::do_submission(user_name, user_submit_path) == submit::result_t::fail) {
