@@ -10,6 +10,7 @@
 #include <cstdio>
 #include <vector>
 #include <string>
+#include <filesystem>
 
 /******************************************************************************
  * MACROS AND DEFINITIONS
@@ -42,21 +43,44 @@ enum class create_dir_result_t { created, exists, fail };
 static const std::string path_prefix("/c/cs323/Hwk" STR(HWK) "/.submit");
 static const std::string home_prefix("/home/accts");
 
+static const off_t max_allowed_file_size = 1*1024*1024;
+static const std::vector<std::string> disallowed_suffix = {
+    ".o",
+    ".swp",
+    ".out",
+".exe",
+};
+
+static const std::vector<std::string> disallowed_substring = {
+    "vgcore.",
+    ".core.",
+};
+
 
 /******************************************************************************
  * PROCEDURES
  ******************************************************************************/
-bool is_file_allowed(const std::string & f_name) {
-    static const std::vector<std::string> disallowed_suffix = {
-        ".o",
-        ".swp",
-        ".out",
-    };
+off_t get_regular_file_size(const std::string & f_name) {
+    struct stat info;
 
-    static const std::vector<std::string> disallowed_substring = {
-        "vgcore.",
-        ".core.",
-    };
+    if(stat(f_name.c_str(), &info) != -1 && (info.st_mode & S_IFMT) == S_IFREG) {
+        return info.st_size;
+    }
+
+    return -1;
+}
+
+time_t get_modified_time_sec(const std::string &path) {
+    struct stat info;
+
+    if(stat(path.c_str(), &info) != -1) {
+        return info.st_mtim.tv_sec;
+    }
+
+    return 0;
+}
+
+bool is_file_allowed(const std::string & f_name) {
 
     for(auto it = disallowed_suffix.begin(); it != disallowed_suffix.end(); ++it) {
         if((*it).size() > f_name.size()) continue;
@@ -76,23 +100,6 @@ bool is_file_allowed(const std::string & f_name) {
 
 
 
-off_t get_regular_file_size(const std::string & f_name) {
-    struct stat info;
-    if(stat(f_name.c_str(), &info) != -1 && (info.st_mode & S_IFMT) == S_IFREG) {
-        return info.st_size;
-    }
-    return -1;
-}
-
-time_t get_modified_time_sec(const std::string &path) {
-    struct stat info;
-    if(stat(path.c_str(), &info) != -1) {
-        return info.st_mtim.tv_sec;
-    }
-    return 0;
-}
-
-
 result_t try_submit_file(const std::string & f_name, const std::string & submit_path) {
     off_t f_size = get_regular_file_size(f_name);
 
@@ -102,6 +109,13 @@ result_t try_submit_file(const std::string & f_name, const std::string & submit_
 
     if(!is_file_allowed(f_name)) {
         std::cout << "    [i] Skipping: " << f_name << ", disallowed file type.\n";
+        return result_t::fail;
+    }
+
+    if(f_size > max_allowed_file_size) {
+        std::cout
+            << "    [i] Skipping: " << f_name << ", file too large (max : "
+            << max_allowed_file_size << ")\n";
         return result_t::fail;
     }
 
@@ -269,6 +283,51 @@ result_t do_submission(const std::string &user_name, const std::string &user_sub
 }
 
 
+
+std::string stage_files(const std::string &user_name) {
+    char path_template[] = "/tmp/cs323-stage-XXXXXX";
+    std::string tmp_dir(mkdtemp(path_template));
+
+#if defined(ALL)
+    DIR* current_dir = opendir(".");
+    struct dirent *current_dir_entry;
+    while(current_dir != NULL && (current_dir_entry = readdir(current_dir)) != NULL) {
+        if(try_submit_file(
+                std::string(current_dir_entry->d_name),
+                tmp_dir) == result_t::success) {
+        }
+    }
+#elif defined(SINGLE)
+    if(try_submit_file(STR(SINGLE), tmp_dir) == result_t::fail) {
+        std::cerr << "[!] Error: Failed to submit assignment.\n";
+        return std::string();
+    }
+#endif
+
+    std::cout << "[i] Staged files to " << tmp_dir << "\n";
+
+
+    return tmp_dir;
+
+}
+
+
+//void do_safe_compilation() {
+//
+//    pid_t pid = fork();
+//    if(pid == 0) {
+//        /* De escalate permissions */
+//        setgid(getuid());
+//
+//        (void) execl("make", NULL);
+//        std::cerr << "[!] Failed to exec make\n";
+//        exit(1);
+//
+//    } else {
+//    }
+//}
+
+
 result_t do_retrieval(const std::string &user_name, const std::string &user_submit_path, int sub_num) {
     std::string user_submit_num_path = user_submit_path + "/" + std::to_string(sub_num);
     std::string home_dir_dst = home_prefix + "/" + user_name + "/retrieved-Hwk1-sub-" + std::to_string(sub_num);
@@ -372,6 +431,9 @@ int main(int argc, char *argv[]) {
 
 
     } else {
+
+        (void) submit::stage_files(user_name);
+
         if(submit::do_submission(user_name, user_submit_path) == submit::result_t::fail) {
             return 1;
         }
