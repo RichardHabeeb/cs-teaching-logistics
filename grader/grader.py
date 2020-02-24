@@ -65,12 +65,15 @@ class Gradebook:
 
 
 class Assignment():
+    DATE_FORMAT = "%m/%d/%Y %I:%M %p"
+
     def __init__(self, config_path):
         with open(config_path) as config_file:
             config = json.load(config_file)
 
         self.name = config["name"]
         self.gradebook_name = config["canvas_gradebook_name"]
+        self.total_points = config["total_points"]
         self.due_dates = config["due_dates"]
         self.extensions = config["extensions"]
         self.submit_path = config["submit_path"]
@@ -91,15 +94,37 @@ class Assignment():
         key = (self.extensions[net_id] if net_id in self.extensions else "__default__")
 
         close = time.mktime((
-            datetime.datetime.strptime(self.due_dates[key]["close_date"], "%m/%d/%Y %I:%M %p") +
+            datetime.datetime.strptime(self.due_dates[key]["close_date"], Assignment.DATE_FORMAT) +
             datetime.timedelta(minutes=self.due_dates[key]["fudge_time_mins"])).timetuple())
 
-        latest_file = max(glob.glob(os.path.join(path, "*")), key=os.path.getmtime)
-        t = os.path.getmtime(latest_file)
+        files = glob.glob(os.path.join(path, "*"))
+        if len(files) == 0:
+            return True
 
+        latest_file = max(files, key=os.path.getmtime)
+        t = os.path.getmtime(latest_file)
         return t <= close
 
 
+    def get_late_deduction(self, net_id, path):
+        if not os.path.isdir(path):
+            return 0
+
+        key = (self.extensions[net_id] if net_id in self.extensions else "__default__")
+
+        due = (datetime.datetime.strptime(self.due_dates[key]["due_date"], Assignment.DATE_FORMAT) +
+              datetime.timedelta(minutes=self.due_dates[key]["fudge_time_mins"]))
+
+        files = glob.glob(os.path.join(path, "*"))
+        if len(files) == 0:
+            return 0
+
+        latest_file = max(files, key=os.path.getmtime)
+        t = datetime.datetime.fromtimestamp(os.path.getmtime(latest_file))
+
+        return max(0, self.total_points *
+                      ((t-due).total_seconds()//(24*60*60) + 1) *
+                      self.due_dates[key]["late_percent_per_day"] / 100.0)
 
 class TestRunner():
 
@@ -110,6 +135,25 @@ class TestRunner():
         self.student_path = os.path.join(self.assignment.submit_path, self.net_id)
         self.latest_submission_path = None
         self.latest_submission_num = None
+
+    def print_late_info(self):
+        print("[i] Student: " + self.name +  " (" + self.net_id + ")...")
+
+        if not os.path.isdir(self.student_path):
+            print("\t[!] No submission found.")
+            return
+
+        self.find_latest_valid_submission()
+
+        if self.latest_submission_path is None:
+            print("\t[!] No on time submissions.")
+            return
+
+        print("\t[i] Using:", self.latest_submission_path)
+
+        late_penalty = self.assignment.get_late_deduction(self.net_id, self.latest_submission_path)
+        print("\t[i] Late penalty: " + str(late_penalty))
+
 
     def grade(self):
         print("[i] Grading " + self.name +  " (" + self.net_id + ")...")
@@ -126,7 +170,10 @@ class TestRunner():
 
         print("\t[i] Using:", self.latest_submission_path)
 
-        score = 0
+        late_penalty = self.assignment.get_late_deduction(self.net_id, self.latest_submission_path)
+        print("\t[i] Late penalty: " + str(late_penalty))
+
+        score = -late_penalty
         with tempfile.TemporaryDirectory() as temp_dir:
             original_working_dir = os.getcwd()
             exec_path = self.latest_submission_path
@@ -185,7 +232,7 @@ class TestRunner():
 
 
 
-def main(gradebook_input_file, gradebook_output_path, assignment_config_file, student_to_grade, skip_graded):
+def main(gradebook_input_file, gradebook_output_path, assignment_config_file, student_to_grade, skip_graded, late_info):
     print("######################################################################")
     print("#                         AUTO GRADER                                #")
     print("######################################################################")
@@ -205,6 +252,10 @@ def main(gradebook_input_file, gradebook_output_path, assignment_config_file, st
             continue
 
         runner = TestRunner(assignment, student, book.name(student))
+
+        if late_info:
+            runner.print_late_info()
+            continue
 
         try:
             book.set_grade(student, assignment, runner.grade())
@@ -233,9 +284,16 @@ if __name__ == "__main__":
     parser.add_argument("output_gradebook", help="Path for where to create the final gradebook")
     parser.add_argument("--student", type=str, help="Grade a specific student (netid)")
     parser.add_argument("--skip_graded", action="store_true", help="Skip grading students that already have a grade")
+    parser.add_argument("--late_info", action="store_true", help="Just show the late deductions")
     #parser.add_argument("--students", type=str, help="Grade a list of netids")
     #parser.add_argument("--skip", help="Don't grade these students")
 
 
     args = parser.parse_args()
-    main(args.gradebook, args.output_gradebook, args.config, args.student, args.skip_graded)
+    main(
+        args.gradebook,
+        args.output_gradebook,
+        args.config,
+        args.student,
+        args.skip_graded,
+        args.late_info)
