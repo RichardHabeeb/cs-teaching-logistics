@@ -417,13 +417,6 @@ int main(int argc, char *argv[]) {
         }
 
         std::string user_submit_num_path = user_submit_path + "/" + std::to_string(sub_num);
-        std::string dest_path = submit::home_prefix + "/" + user_name +
-            "/hwk" STR(HWK) "-" + std::to_string(sub_num) + ".zip";
-
-        if(access(dest_path.c_str(), F_OK) != -1) {
-            std::cerr << "[!] File already exists: " << dest_path << "\n";
-            return 1;
-        }
 
         if(submit::do_retrieval(user_name, user_submit_path, sub_num) == submit::result_t::fail) {
             return 1;

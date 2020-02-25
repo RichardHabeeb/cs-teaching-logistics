@@ -271,12 +271,6 @@ def main(gradebook_input_file, gradebook_output_path, assignment_config_file, st
 
 
 
-
-
-
-
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("gradebook", help="Canvas exported gradebook CSV file")

@@ -1,7 +1,27 @@
 #include <iostream>
 #include <fstream>
 #include <unistd.h>
+#include <fcntl.h>
 
+/******************************************************************************
+ * MACROS AND DEFINITIONS
+ ******************************************************************************/
+#ifndef HWK
+#error *** Need to define a homework number ***
+#endif
+
+#define STR_HELPER(x) #x
+#define STR(x) STR_HELPER(x)
+
+/******************************************************************************
+ * CONSTANTS
+ ******************************************************************************/
+static const std::string path_prefix("/c/cs323/Hwk" STR(HWK) "/.result");
+
+
+/******************************************************************************
+ * PROCEDURES
+ ******************************************************************************/
 std::string get_user() {
     char login_name[64];
     getlogin_r(login_name, sizeof(login_name));
@@ -14,17 +34,18 @@ int main() {
     std::string net_id = get_user();
     int sub_num = 0;
 
-    while(access(("/c/cs323/Hwk1/.result/"
-                    + net_id + "-"
-                    + std::to_string(sub_num)
-                    + ".txt").c_str(), F_OK) == -1 && sub_num < 1024*1024) {
-        ++sub_num;
+    std::string path_with_net_id = path_prefix + "/" + net_id + "-";
+
+    while(faccessat(0, (path_with_net_id + std::to_string(sub_num) + ".txt").c_str(), F_OK, AT_EACCESS) == -1) {
+        if(++sub_num > 1024*16) {
+            std::cout << "No results log found for " << net_id << "\n";
+            return -1;
+        }
     }
 
-
-    std::ifstream myfile;
-    myfile.open("/c/cs323/Hwk1/.result/" + net_id + "-" + std::to_string(sub_num) + ".txt");
-    std::cout << myfile.rdbuf();
-    myfile.close();
+    std::ifstream log_file;
+    log_file.open(path_with_net_id + std::to_string(sub_num) + ".txt");
+    std::cout << log_file.rdbuf();
+    log_file.close();
     return 0;
 }
