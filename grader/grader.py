@@ -79,11 +79,11 @@ class Assignment():
         self.submit_path = config["submit_path"]
         self.output_path = config["output_path"]
         self.make_dry_run = config["make_dry_run"]
-        self.cmds = config["cmds"]
+        self.execution = config["execution_phases"]
         self.do_stage = "stage" in config
         if self.do_stage:
-            self.stage_template = (None if "template" not in config["stage"]
-                    else config["stage"]["template"])
+            self.stage_template = (None if "template_dir" not in config["stage"]
+                    else config["stage"]["template_dir"])
             self.stage_ignore_patterns = shutil.ignore_patterns(*([] if "ignore_patterns" not in config["stage"]
                 else config["stage"]["ignore_patterns"]))
 
@@ -128,13 +128,14 @@ class Assignment():
 
 class TestRunner():
 
-    def __init__(self, assignment, net_id, name):
+    def __init__(self, assignment, net_id, name, sub_num):
         self.assignment = assignment
         self.net_id = net_id
         self.name = name
         self.student_path = os.path.join(self.assignment.submit_path, self.net_id)
         self.latest_submission_path = None
         self.latest_submission_num = None
+
 
     def print_late_info(self):
         print("[i] Student: " + self.name +  " (" + self.net_id + ")...")
@@ -155,14 +156,21 @@ class TestRunner():
         print("\t[i] Late penalty: " + str(late_penalty))
 
 
-    def grade(self):
+    def grade(self, sub_num=None, pause=False):
         print("[i] Grading " + self.name +  " (" + self.net_id + ")...")
 
         if not os.path.isdir(self.student_path):
             print("\t[!] No submission found.")
             return 0
 
-        self.find_latest_valid_submission()
+        if(sub_num is not None):
+            self.latest_submission_num = sub_num
+            self.latest_submission_path = os.path.join(self.student_path, str(sub_num))
+            if not os.path.isdir(self.latest_submission_path):
+                print("\t[!] Submission " + sub_num + " not found.")
+                return 0
+        else:
+            self.find_latest_valid_submission()
 
         if self.latest_submission_path is None:
             print("\t[!] No on time submissions.")
@@ -174,50 +182,81 @@ class TestRunner():
         print("\t[i] Late penalty: " + str(late_penalty))
 
         score = -late_penalty
+        extra_credit_score = 0
         with tempfile.TemporaryDirectory() as temp_dir:
             original_working_dir = os.getcwd()
             exec_path = self.latest_submission_path
 
             if self.assignment.do_stage:
                 exec_path = str(temp_dir)
-                shutil.copytree(self.latest_submission_path, exec_path,
-                        ignore=self.assignment.stage_ignore_patterns, dirs_exist_ok=True)
-                if self.assignment.stage_template is not None:
-                    shutil.copytree(self.assignment_stage_template, exec_path,
-                        ignore=self.assignment.stage_ignore_patterns, dirs_exist_ok=True)
-
+                self.setup_stage(exec_path)
 
             os.chdir(exec_path)
             print("\t[i] Executing from ", exec_path)
 
             if self.assignment.make_dry_run:
-                print("\t[i] Make dry run (listing files):")
-                os.system("ls | sed 's/.*/\t\t&/'")
-                print("\t[i] Make dry run (make -n):")
-                os.system("make -n | sed 's/.*/\t\t&/'")
-                result = input("\t[?] Continue? [Y/n]:").lower().strip()
-                if result == "n":
-                    os.chdir(original_working_dir)
-                    return None
+                self.make_dry_run()
 
             log_path = os.path.join(self.assignment.output_path,
                 self.net_id + "-" + str(self.latest_submission_num) + ".txt")
 
+            if pause is not None and pause:
+                input("\t[?] Press enter to run commands.")
+
             print("\t[i] Running commands...")
             with open(log_path, "wb") as f:
-                for c in self.assignment.cmds:
-                    print("\t\t" + c)
-                    command_pipe = subprocess.Popen(shlex.split(c), stdout=subprocess.PIPE)
-                    (command_stdout, ignore) = command_pipe.communicate()
-                    f.write(command_stdout)
-                    score += command_pipe.wait()
+                for phase in self.assignment.execution:
+                    if "extra_credit" in phase and phase["extra_credit"]:
+                        extra_credit_score += self.execute_phase(phase, f)
+                    else:
+                        score += self.execute_phase(phase, f)
 
             print("\t[i] Log file: ", log_path)
-            print("\t[i] Score:", score)
+            print("\t[i] Standard Score (lateness adjusted):", score)
+            print("\t[i] Extra Credit:", extra_credit_score)
 
             os.chdir(original_working_dir)
 
         return score
+
+    def make_dry_run(self):
+        print("\t[i] Make dry run (listing files):")
+        os.system("ls | sed 's/.*/\t\t&/'")
+        print("\t[i] Make dry run (make -n):")
+        os.system("make -n | sed 's/.*/\t\t&/'")
+        result = input("\t[?] Continue? [Y/n]:").lower().strip()
+        if result == "n":
+            os.chdir(original_working_dir)
+            return None
+
+    def setup_stage(self, exec_path):
+        shutil.copytree(self.latest_submission_path, exec_path,
+                ignore=self.assignment.stage_ignore_patterns, dirs_exist_ok=True)
+        # Copy template last, intentionally overwriting any submitted template files
+        if self.assignment.stage_template is not None:
+            shutil.copytree(self.assignment.stage_template, exec_path, dirs_exist_ok=True)
+
+
+    def execute_phase(self, phase, log_file):
+        log_file.write(b"######################################################################\n")
+        #log_file.write(b"# PHASE: " + phase["name"] + "\n")
+        #log_file.write(b"######################################################################\n")
+        print("\t\t[i] Phase: " + phase["name"])
+        phase_score = 0.0
+        for c in phase["cmds"]:
+            print("\t\t\t[$] " + c)
+            command_pipe = subprocess.Popen(shlex.split(c), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            (command_stdout, command_stderr) = command_pipe.communicate()
+
+            log_file.write(b"### STDOUT ##########################\n")
+            log_file.write(command_stdout)
+            log_file.write(b"### STDERR ##########################\n")
+            log_file.write(command_stderr)
+            phase_score += command_pipe.wait()
+
+        phase_score_scaled = (phase_score / phase["max"])*self.assignment.total_points*phase["weight"]
+        print("\t\t\t[i] Phase score: " + str(phase_score_scaled))
+        return phase_score_scaled
 
 
     def find_latest_valid_submission(self):
@@ -232,7 +271,14 @@ class TestRunner():
 
 
 
-def main(gradebook_input_file, gradebook_output_path, assignment_config_file, student_to_grade, skip_graded, late_info):
+def main(gradebook_input_file,
+         gradebook_output_path,
+         assignment_config_file,
+         student_to_grade,
+         submission_to_grade,
+         skip_graded,
+         late_info,
+         pause_before_running):
     print("######################################################################")
     print("#                         AUTO GRADER                                #")
     print("######################################################################")
@@ -251,14 +297,15 @@ def main(gradebook_input_file, gradebook_output_path, assignment_config_file, st
             print("[i] Skipping " + student)
             continue
 
-        runner = TestRunner(assignment, student, book.name(student))
+        runner = TestRunner(assignment, student, book.name(student), submission_to_grade)
 
         if late_info:
             runner.print_late_info()
             continue
 
         try:
-            book.set_grade(student, assignment, runner.grade())
+            book.set_grade(student, assignment,
+                    runner.grade(submission_to_grade, pause_before_running))
         except KeyboardInterrupt:
             os.chdir(original_working_dir)
             book.write_grades(gradebook_output_path)
@@ -277,8 +324,10 @@ if __name__ == "__main__":
     parser.add_argument("config", help="Assignment config json file")
     parser.add_argument("output_gradebook", help="Path for where to create the final gradebook")
     parser.add_argument("--student", type=str, help="Grade a specific student (netid)")
+    parser.add_argument("--submission", type=int, help="Grade a specific submission number")
     parser.add_argument("--skip_graded", action="store_true", help="Skip grading students that already have a grade")
     parser.add_argument("--late_info", action="store_true", help="Just show the late deductions")
+    parser.add_argument("--pause", action="store_true", help="Pause before starting to execute user code")
     #parser.add_argument("--students", type=str, help="Grade a list of netids")
     #parser.add_argument("--skip", help="Don't grade these students")
 
@@ -289,5 +338,7 @@ if __name__ == "__main__":
         args.output_gradebook,
         args.config,
         args.student,
+        args.submission,
         args.skip_graded,
-        args.late_info)
+        args.late_info,
+        args.pause)

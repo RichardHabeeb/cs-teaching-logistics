@@ -19,7 +19,7 @@
 #error *** Need to define a homework number ***
 #endif
 
-#if !(defined(ALL) || defined(SINGLE))
+#if !(defined(SUBMIT_ALL) || defined(SUBMIT_SINGLE) || defined(SUBMIT_LIST))
 #error *** Need to define a submission style ***
 #endif
 
@@ -43,12 +43,24 @@ enum class create_dir_result_t { created, exists, fail };
 static const std::string path_prefix("/c/cs323/Hwk" STR(HWK) "/.submit");
 static const std::string home_prefix("/home/accts");
 
+static const std::vector<std::string> files_to_submit = {
+#if defined(SUBMIT_LIST)
+    SUBMIT_LIST
+#elif defined(SUBMIT_SINGLE)
+    STR(SUBMIT_SINGLE)
+#endif
+};
+
 static const off_t max_allowed_file_size = 1*1024*1024;
 static const std::vector<std::string> disallowed_suffix = {
     ".o",
     ".swp",
     ".out",
-".exe",
+    ".exe",
+    ".tar",
+    ".zip",
+    ".gz",
+    "~",
 };
 
 static const std::vector<std::string> disallowed_substring = {
@@ -252,23 +264,25 @@ result_t do_submission(const std::string &user_name, const std::string &user_sub
 
     int submission_count = 0;
 
-#if defined(ALL)
-    DIR* current_dir = opendir(".");
-    struct dirent *current_dir_entry;
-    while(current_dir != NULL && (current_dir_entry = readdir(current_dir)) != NULL) {
-        if(try_submit_file(
-                std::string(current_dir_entry->d_name),
-                user_submit_num_path) == result_t::success) {
-            submission_count++;
+    if(files_to_submit.size() == 0) {
+        DIR* current_dir = opendir(".");
+        struct dirent *current_dir_entry;
+        while(current_dir != NULL && (current_dir_entry = readdir(current_dir)) != NULL) {
+            if(try_submit_file(
+                    std::string(current_dir_entry->d_name),
+                    user_submit_num_path) == result_t::success) {
+                submission_count++;
+            }
+        }
+    } else {
+        for(auto it = files_to_submit.begin(); it != files_to_submit.end(); ++it) {
+            if(try_submit_file(*it, user_submit_num_path) == result_t::success) {
+                submission_count++;
+            } else {
+                std::cerr << "[!] Error: Failed to submit " << *it  << "\n";
+            }
         }
     }
-#elif defined(SINGLE)
-    if(try_submit_file(STR(SINGLE), user_submit_num_path) == result_t::fail) {
-        std::cerr << "[!] Error: Failed to submit assignment.\n";
-        return result_t::fail;
-    }
-    submission_count++;
-#endif
 
     if(submission_count == 0) {
         std::cerr << "[!] Error: No files to submit.\n";
@@ -283,49 +297,6 @@ result_t do_submission(const std::string &user_name, const std::string &user_sub
 }
 
 
-
-std::string stage_files(const std::string &user_name) {
-    char path_template[] = "/tmp/cs323-stage-XXXXXX";
-    std::string tmp_dir(mkdtemp(path_template));
-
-#if defined(ALL)
-    DIR* current_dir = opendir(".");
-    struct dirent *current_dir_entry;
-    while(current_dir != NULL && (current_dir_entry = readdir(current_dir)) != NULL) {
-        if(try_submit_file(
-                std::string(current_dir_entry->d_name),
-                tmp_dir) == result_t::success) {
-        }
-    }
-#elif defined(SINGLE)
-    if(try_submit_file(STR(SINGLE), tmp_dir) == result_t::fail) {
-        std::cerr << "[!] Error: Failed to submit assignment.\n";
-        return std::string();
-    }
-#endif
-
-    std::cout << "[i] Staged files to " << tmp_dir << "\n";
-
-
-    return tmp_dir;
-
-}
-
-
-//void do_safe_compilation() {
-//
-//    pid_t pid = fork();
-//    if(pid == 0) {
-//        /* De escalate permissions */
-//        setgid(getuid());
-//
-//        (void) execl("make", NULL);
-//        std::cerr << "[!] Failed to exec make\n";
-//        exit(1);
-//
-//    } else {
-//    }
-//}
 
 
 result_t do_retrieval(const std::string &user_name, const std::string &user_submit_path, int sub_num) {
@@ -368,10 +339,10 @@ int main(int argc, char *argv[]) {
         " __)/____)\n"
         " submission tool\n"
         "\n"
-#if defined(ALL)
+#if defined(SUBMIT_ALL)
         "[i] This tool will submit ALL of the files \n"
-#elif defined(SINGLE)
-        "[i] This tool will submit your " STR(SINGLE) " file \n"
+#elif defined(SUBMIT_SINGLE)
+        "[i] This tool will submit your " STR(SUBMIT_SINGLE) " file \n"
 #endif
         "    in the current directory for your project.\n"
         "    You may submit any number of times, and \n"
@@ -424,9 +395,6 @@ int main(int argc, char *argv[]) {
 
 
     } else {
-
-        (void) submit::stage_files(user_name);
-
         if(submit::do_submission(user_name, user_submit_path) == submit::result_t::fail) {
             return 1;
         }

@@ -5,7 +5,7 @@ cc_binary(
         "submit.cpp",
     ],
     defines = [
-        "ALL",
+        "SUBMIT_ALL",
         "HWK=1"
     ],
 )
@@ -17,7 +17,7 @@ cc_binary(
         "submit.cpp",
     ],
     defines = [
-        "SINGLE=dmalloc.cc",
+        "SUBMIT_SINGLE=dmalloc.cc",
         "HWK=2"
     ],
 )
@@ -29,7 +29,7 @@ cc_binary(
         "submit.cpp",
     ],
     defines = [
-        "ALL",
+        "SUBMIT_LIST=STR(kernel.c),STR(kernel.h),STR(k-loader.c)",
         "HWK=4"
     ],
 )
