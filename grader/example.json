@@ -1,0 +1,72 @@
+{
+    "name" : "Project 2",
+    "canvas_gradebook_name" : "Project 2: Dmalloc (144332)",
+    "total_points" : 100,
+    "submit_path" : "/c/cs323/Hwk2/.submit",
+    "output_path" : "/c/cs323/Hwk2/.result",
+    "make_dry_run" : false,
+    "stage" : {
+        "ignore_patterns" : ["*.o", "*.out", "*.exe", "*.gch", "*.py", "submit", "*.pl"],
+        "template_dir" : "/c/cs323/Hwk2/.template/"
+    },
+    "execution_phases" : [
+        {
+            "name" : "Public Tests",
+            "cmds" : [
+                "make clean",
+                "bash -c \"exit $(make -s check-1-38 2>&1 | tee /dev/stderr | grep -c 'test... OK')\""
+            ],
+            "max" : 38,
+            "weight" : 0.80
+        },
+        {
+            "name" : "Private Tests",
+            "cmds" : [
+                "make clean",
+                "python3 hhrun.py"
+            ],
+            "max" : 6,
+            "weight" : 0.20
+        },
+        {
+            "name" : "Extra Credit",
+            "cmds" : [
+                "make clean",
+                "bash -c \"exit $(make -s SAN=1 check-1-38 2>&1 | tee /dev/stderr | grep -c 'test... OK')\""],
+            "max" : 38,
+            "weight" : 0.10,
+            "extra_credit" : true
+        }
+    ],
+    "extensions": {
+        "netid1" : "1_late_day_free",
+        "netid2" : "2_late_days_free",
+        "netid3" : "extension3"
+    },
+    "due_dates" : {
+        "__default__" : {
+            "due_date" : "2/12/2020 12:00 pm",
+            "close_date" : "2/16/2020 12:00 pm",
+            "fudge_time_mins" : 30,
+            "late_percent_per_day" : 5.0
+        },
+        "1_late_day_free" : {
+            "due_date" : "2/13/2020 12:00 pm",
+            "close_date" : "2/16/2020 12:00 pm",
+            "fudge_time_mins" : 30,
+            "late_percent_per_day" : 5.0
+        },
+        "2_late_days_free" : {
+            "due_date" : "2/14/2020 12:00 pm",
+            "close_date" : "2/16/2020 12:00 pm",
+            "fudge_time_mins" : 30,
+            "late_percent_per_day" : 5.0
+        },
+        "extension3" : {
+            "due_date" : "2/18/2020 12:00 pm",
+            "close_date" : "2/18/2020 12:00 pm",
+            "fudge_time_mins" : 30,
+            "late_percent_per_day" : 5.0
+        }
+    }
+}

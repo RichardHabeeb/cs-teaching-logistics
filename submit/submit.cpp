@@ -92,6 +92,17 @@ time_t get_modified_time_sec(const std::string &path) {
     return 0;
 }
 
+bool group_can_rwx(const std::string &path) {
+    struct stat info;
+
+    if(stat(path.c_str(), &info) != -1) {
+        return (info.st_mode & S_IRWXG);
+    }
+
+    return false;
+}
+
+
 bool is_file_allowed(const std::string & f_name) {
 
     for(auto it = disallowed_suffix.begin(); it != disallowed_suffix.end(); ++it) {
@@ -194,10 +205,13 @@ std::string get_user() {
 
 
 create_dir_result_t create_dir(const std::string &path) {
-
     DIR* dir = opendir(path.c_str());
     if (dir) {
         closedir(dir);
+        /* Fix permissions if necessarry */
+        if(chmod(path.c_str(), S_IRWXU | S_IRWXG) == -1) {
+            return create_dir_result_t::fail;
+        }
         return create_dir_result_t::exists;
     } else if (ENOENT == errno && mkdir(path.c_str(), S_IRWXU | S_IRWXG) == 0) {
         return create_dir_result_t::created;
@@ -230,6 +244,21 @@ void print_files_in_dir(const std::string &path) {
 }
 
 
+void try_chmod_files_in_dir(const std::string &path, mode_t perms) {
+    DIR* current_dir = opendir(path.c_str());
+    struct dirent *current_dir_entry;
+    while(current_dir != NULL && (current_dir_entry = readdir(current_dir)) != NULL) {
+        std::string f_path = path + "/" + current_dir_entry->d_name;
+
+        off_t f_size = get_regular_file_size(f_path);
+        if(f_size == -1) continue;
+
+        (void) chown(f_path.c_str(), getuid(), getegid());
+        (void) chmod(f_path.c_str(), perms);
+    }
+}
+
+
 int next_submission_number(const std::string &user_submit_path) {
     int sub_num = 0;
     std::string user_submit_num_path;
@@ -239,6 +268,11 @@ int next_submission_number(const std::string &user_submit_path) {
         DIR* dir = opendir(user_submit_num_path.c_str());
         if (dir) {
             closedir(dir);
+
+            /* ensure permissions are set, fixing older submissions */
+            (void) chown(user_submit_num_path.c_str(), getuid(), getegid());
+            (void) chmod(user_submit_num_path.c_str(), S_IRWXU | S_IRWXG);
+            try_chmod_files_in_dir(user_submit_num_path, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH);
         } else if (ENOENT == errno) {
             return sub_num;
         }
@@ -345,8 +379,8 @@ int main(int argc, char *argv[]) {
         "[i] This tool will submit your " STR(SUBMIT_SINGLE) " file \n"
 #endif
         "    in the current directory for your project.\n"
-        "    You may submit any number of times, and \n"
-        "    more intermediate submissions are\n"
+        "    You may submit any number of times, and\n"
+        "    more intermediate submissions are highly\n"
         "    encouraged.\n"
         "[i] usage: /c/cs323/Hwk" STR(HWK) "/submit [info|get [N]]\n"
         "    [-] info will list the files submitted for\n"
