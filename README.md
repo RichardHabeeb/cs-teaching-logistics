@@ -1,5 +1,5 @@
 # Computer Science Teaching Logistics
-Tools for teaching computer science classes. This toolset was designed to work on the Yale Zoo computers.
+Tools for teaching computer science classes. This toolset was designed to work on the Yale Zoo computers. You can build this project using [bazel](https://bazel.build/).
 
 ## Submit
 This tool is intended to be used as a setgid program. It is currently a work in progress.
