@@ -1,4 +1,4 @@
-# cs-teaching-logistics
+# Computer Science Teaching Logistics
 Tools for teaching computer science classes
 
 ## Submit
@@ -12,3 +12,5 @@ Example executions:
 /c/cs323/Hwk1/submit get
 /c/cs323/Hwk1/submit get 1
 ```
+## Grader
+A python script to automatically build and run a set of student submitted code. I can calculate late scores, and handle Canvas gradebook csv files.
