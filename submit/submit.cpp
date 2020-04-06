@@ -208,10 +208,11 @@ create_dir_result_t create_dir(const std::string &path) {
     DIR* dir = opendir(path.c_str());
     if (dir) {
         closedir(dir);
-        /* Fix permissions if necessarry */
+        /* // Fix permissions if necessarry
         if(chmod(path.c_str(), S_IRWXU | S_IRWXG) == -1) {
             return create_dir_result_t::fail;
         }
+	*/
         return create_dir_result_t::exists;
     } else if (ENOENT == errno && mkdir(path.c_str(), S_IRWXU | S_IRWXG) == 0) {
         return create_dir_result_t::created;
@@ -270,9 +271,9 @@ int next_submission_number(const std::string &user_submit_path) {
             closedir(dir);
 
             /* ensure permissions are set, fixing older submissions */
-            (void) chown(user_submit_num_path.c_str(), getuid(), getegid());
-            (void) chmod(user_submit_num_path.c_str(), S_IRWXU | S_IRWXG);
-            try_chmod_files_in_dir(user_submit_num_path, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH);
+            //(void) chown(user_submit_num_path.c_str(), getuid(), getegid());
+            //(void) chmod(user_submit_num_path.c_str(), S_IRWXU | S_IRWXG);
+            //try_chmod_files_in_dir(user_submit_num_path, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH);
         } else if (ENOENT == errno) {
             return sub_num;
         }

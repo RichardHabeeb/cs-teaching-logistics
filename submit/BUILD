@@ -33,3 +33,15 @@ cc_binary(
         "HWK=4"
     ],
 )
+
+cc_binary(
+    name = "submit-5",
+    deps = [],
+    srcs = [
+        "submit.cpp",
+    ],
+    defines = [
+        "SUBMIT_SINGLE=abash_process.c",
+        "HWK=5"
+    ],
+)
