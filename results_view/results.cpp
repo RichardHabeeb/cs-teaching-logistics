@@ -6,8 +6,8 @@
 /******************************************************************************
  * MACROS AND DEFINITIONS
  ******************************************************************************/
-#ifndef HWK
-#error *** Need to define a homework number ***
+#ifndef RESULTS_PATH
+#error *** Need to define a RESULTS_PATH ***
 #endif
 
 #define STR_HELPER(x) #x
@@ -16,7 +16,7 @@
 /******************************************************************************
  * CONSTANTS
  ******************************************************************************/
-static const std::string path_prefix("/c/cs323/Hwk" STR(HWK) "/.result");
+static const std::string path_prefix(STR(RESULTS_PATH));
 
 
 /******************************************************************************

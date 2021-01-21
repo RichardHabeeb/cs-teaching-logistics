@@ -5,7 +5,7 @@ cc_binary(
         "results.cpp",
     ],
     defines = [
-        "HWK=1"
+        "RESULTS_PATH=/c/cs323/Hwk1/.result"
     ],
 )
 cc_binary(
@@ -15,7 +15,7 @@ cc_binary(
         "results.cpp",
     ],
     defines = [
-        "HWK=2"
+        "RESULTS_PATH=/c/cs323/Hwk2/.result"
     ],
 )
 cc_binary(
@@ -25,7 +25,7 @@ cc_binary(
         "results.cpp",
     ],
     defines = [
-        "HWK=4"
+        "RESULTS_PATH=/c/cs323/Hwk4/.result"
     ],
 )
 cc_binary(
@@ -35,6 +35,26 @@ cc_binary(
         "results.cpp",
     ],
     defines = [
-        "HWK=5"
+        "RESULTS_PATH=/c/cs323/Hwk5/.result"
+    ],
+)
+cc_binary(
+    name = "results-final",
+    deps = [],
+    srcs = [
+        "results.cpp",
+    ],
+    defines = [
+        "RESULTS_PATH=/c/cs323/Final/.result"
+    ],
+)
+cc_binary(
+    name = "results-final-checkin",
+    deps = [],
+    srcs = [
+        "results.cpp",
+    ],
+    defines = [
+        "RESULTS_PATH=/c/cs323/Final/.result-midpoint"
     ],
 )

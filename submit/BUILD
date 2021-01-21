@@ -6,7 +6,8 @@ cc_binary(
     ],
     defines = [
         "SUBMIT_ALL",
-        "HWK=1"
+        "TARGET_DIR=/c/cs323/proj1/.submit",
+        "GET_DIR_PREFIX=/home/accts",
     ],
 )
 
@@ -18,7 +19,8 @@ cc_binary(
     ],
     defines = [
         "SUBMIT_SINGLE=dmalloc.cc",
-        "HWK=2"
+        "TARGET_DIR=/c/cs323/proj2/.submit",
+        "GET_DIR_PREFIX=/home/accts",
     ],
 )
 
@@ -30,7 +32,8 @@ cc_binary(
     ],
     defines = [
         "SUBMIT_LIST=STR(kernel.c),STR(kernel.h),STR(k-loader.c)",
-        "HWK=4"
+        "TARGET_DIR=/c/cs323/proj4/.submit",
+        "GET_DIR_PREFIX=/home/accts",
     ],
 )
 
@@ -42,6 +45,20 @@ cc_binary(
     ],
     defines = [
         "SUBMIT_SINGLE=abash_process.c",
-        "HWK=5"
+        "TARGET_DIR=/c/cs323/proj5/.submit",
+        "GET_DIR_PREFIX=/home/accts",
+    ],
+)
+
+cc_binary(
+    name = "submit-final",
+    deps = [],
+    srcs = [
+        "submit.cpp",
+    ],
+    defines = [
+        "SUBMIT_LIST=STR(kernel.c),STR(kernel.h),STR(k-loader.c),STR(malloc.c)",
+        "TARGET_DIR=/c/cs323/final-proj/.submit",
+        "GET_DIR_PREFIX=/home/accts",
     ],
 )

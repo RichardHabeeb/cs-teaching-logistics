@@ -15,8 +15,12 @@
 /******************************************************************************
  * MACROS AND DEFINITIONS
  ******************************************************************************/
-#ifndef HWK
-#error *** Need to define a homework number ***
+#ifndef TARGET_DIR
+#error *** Need to define a target directory for student submissions ***
+#endif
+
+#ifndef GET_DIR_PREFIX
+#error *** Need to define a base directory for retrieving submissions  ***
 #endif
 
 #if !(defined(SUBMIT_ALL) || defined(SUBMIT_SINGLE) || defined(SUBMIT_LIST))
@@ -26,7 +30,6 @@
 
 #define STR_HELPER(x) #x
 #define STR(x) STR_HELPER(x)
-
 
 
 namespace submit {
@@ -40,8 +43,8 @@ enum class create_dir_result_t { created, exists, fail };
 /******************************************************************************
  * CONSTANTS
  ******************************************************************************/
-static const std::string path_prefix("/c/cs323/Hwk" STR(HWK) "/.submit");
-static const std::string home_prefix("/home/accts");
+static const std::string path_prefix(STR(TARGET_DIR));
+static const std::string home_prefix(STR(GET_DIR_PREFIX));
 
 static const std::vector<std::string> files_to_submit = {
 #if defined(SUBMIT_LIST)
@@ -212,7 +215,7 @@ create_dir_result_t create_dir(const std::string &path) {
         if(chmod(path.c_str(), S_IRWXU | S_IRWXG) == -1) {
             return create_dir_result_t::fail;
         }
-	*/
+    */
         return create_dir_result_t::exists;
     } else if (ENOENT == errno && mkdir(path.c_str(), S_IRWXU | S_IRWXG) == 0) {
         return create_dir_result_t::created;
@@ -375,20 +378,21 @@ int main(int argc, char *argv[]) {
         " submission tool\n"
         "\n"
 #if defined(SUBMIT_ALL)
-        "[i] This tool will submit ALL of the files \n"
-#elif defined(SUBMIT_SINGLE)
-        "[i] This tool will submit your " STR(SUBMIT_SINGLE) " file \n"
+        "[i] This tool will submit ALL of the files "
+#elif defined(SUBMIT_SINGLE) || defined(SUBMIT_LIST)
+        "[i] This tool will submit your ";
+    auto final_iter = --(submit::files_to_submit.end());
+    for(auto iter = submit::files_to_submit.begin(); iter != submit::files_to_submit.end(); ++iter) {
+        std::cout << *iter;
+        if(iter != final_iter) std::cout << ", ";
+    }
+    std::cout << " file(s) "
 #endif
-        "    in the current directory for your project.\n"
-        "    You may submit any number of times, and\n"
-        "    more intermediate submissions are highly\n"
-        "    encouraged.\n"
-        "[i] usage: /c/cs323/Hwk" STR(HWK) "/submit [info|get [N]]\n"
-        "    [-] info will list the files submitted for\n"
-        "        the Nth or latest submission\n"
-        "    [-] get will retrieve the files submitted\n"
-        "        for the Nth or latest submission.\n";
-
+        "in the current directory for your project.\n"
+        "[i] You may submit any number of times.\n"
+        "[i] usage: submit [info|get [N]]\n"
+        "    [-] info will list the files submitted for the Nth or latest submission\n"
+        "    [-] get will retrieve the files submitted for the Nth or latest submission.\n";
 
     /* CREATE USER FOLDER */
     std::string user_name = submit::get_user();
@@ -430,6 +434,16 @@ int main(int argc, char *argv[]) {
 
 
     } else {
+    std::cout <<
+            "[#] Please confirm that you have followed the letter and spirit of the honor policy for this course and have not copied code, plagiarized, inappropriately collaborated, or otherwise cheated on this assignment:\n"
+            "[#] Type 'I have not cheated' to confirm: ";
+        std::string confirmation;
+    std::getline(std::cin, confirmation);
+        if(confirmation != "I have not cheated") {
+            std::cout << "[!] You must adhere to the honor policy to submit.\n";
+            std::cout << ">>" << confirmation << "<<\n";
+            return 1;
+        }
         if(submit::do_submission(user_name, user_submit_path) == submit::result_t::fail) {
             return 1;
         }

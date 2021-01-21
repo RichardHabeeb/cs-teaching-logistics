@@ -1,17 +1,24 @@
 # Computer Science Teaching Logistics
-Tools for teaching computer science classes. This toolset was designed to work on the Yale Zoo computers. You can build this project using [bazel](https://bazel.build/).
+Tools for teaching computer science classes. This toolset was designed to work on the Yale Zoo computers. You can build this project using [bazel](https://bazel.build/). You can install Bazel locally as a user on the Zoo; checkout [these instructions](https://docs.bazel.build/versions/master/install-ubuntu.html#step-2-run-the-installer).
 
-## Submit
-This tool is intended to be used as a setgid program. It is currently a work in progress.
+## `submit`
+Submit is a programming assignment submission program. This tool is intended to be used as a setgid program, it should be placed in a directory that is accessible by students, but unmodifiable by them. It should have some elevated group permissions with the setgid permisssion enabled. This program is intended to be compiled for each assignment to be submitted.
 
-Example executions:
+This program, will copy student submissions into a subdirectory of the `TARGET_DIR` folder (defined in the BUILD file). Ensure that this directory is not readable or writeable by students, and has the group read/write permissions.
+
+Running submit:
 ```
-/c/cs323/Hwk1/submit
-/c/cs323/Hwk1/submit info
-/c/cs323/Hwk1/submit info 1
-/c/cs323/Hwk1/submit get
-/c/cs323/Hwk1/submit get 1
+submit [info|get [N]]
 ```
+
+The `info` arguement will print out all the submitted files for submission N, if specified, otherwise the latest submission.
+
+The `get` argument will copy out all the submitted files to the `GET_DIR_PREFIX` in a subdirectory owned the username of the executing account. This can be `/home/accts` for example to copy the submission into a student's home directory.
+
+Filenames with certain prefixes and suffixes will be ignored by this software. These are defined in the C++ code, but generally cover object files, binary files, and core files.
+
+
+
 ## Grader
 A python script to automatically build and run a set of student submitted code. I can calculate late scores, and handle Canvas gradebook csv files.
 

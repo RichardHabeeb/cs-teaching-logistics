@@ -252,7 +252,9 @@ class TestRunner():
             log_file.write(command_stdout)
             log_file.write(b"### STDERR ##########################\n")
             log_file.write(command_stderr)
-            phase_score += command_pipe.wait()
+            command_score = command_pipe.wait()
+            print("\t\t\t\t[i] " + str(command_score) + " point(s)")
+            phase_score += command_score
 
         phase_score_scaled = (phase_score / phase["max"])*self.assignment.total_points*phase["weight"]
         print("\t\t\t[i] Phase score: " + str(phase_score_scaled))
@@ -289,9 +291,13 @@ def main(gradebook_input_file,
     assignment = Assignment(assignment_config_file)
     original_working_dir = os.getcwd()
 
+    progress = 0
     for student in book:
         if student_to_grade is not None and len(student_to_grade) > 0 and student != student_to_grade:
             continue
+
+        print("[i] Grading progress " + str(progress * 100 / len(book)) + "%")
+        progress +=1
 
         if skip_graded and book.has_grade(student, assignment):
             print("[i] Skipping " + student)
