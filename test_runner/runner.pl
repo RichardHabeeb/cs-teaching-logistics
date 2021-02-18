@@ -55,7 +55,7 @@ sub cleanupTesting {
     }
 
     if ($TYPE eq "Public") {                        # Reminder to students
-       system ("$CLASS_BIN_DIR/checklog -noprint");
+        #system ("$CLASS_BIN_DIR/checklog -noprint");
        system ("$CLASS_BIN_DIR/checkmake -noprint")
           unless ($LANG eq "Perl");
     }
@@ -123,6 +123,13 @@ sub runTest {
       unless (keys %WHICH == 0                  #   only those on command line
 	      || exists $WHICH{$test});
 
+   if(!(-r $testFile) && $TYPE eq "Final") {
+      $testFile = "$where/Final/$TEST";
+      $testFile    =~ s{IJ}{$test};
+      $answers  = "$where/Final/$ANSWER";             # Name of answer file
+      $answers     =~ s{IJ}{$test};
+   }
+
    (-r $testFile)
       || die ("$0: missing test file $testFile\n");
 
@@ -154,7 +161,7 @@ sub runTest {
    }
 
    $points = &correct (@conds);
-   printf ("%3d point  %3s. %s\n", $points, $test, $title);
+   printf ("%3d point  %3s  %s\n", $points, $testFile, $title);
 
    system ("rm -f $results $errors $diffs");
    pop @UNLINK;  pop @UNLINK;  pop @UNLINK;     # Remove added files
