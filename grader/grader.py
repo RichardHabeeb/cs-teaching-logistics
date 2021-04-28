@@ -329,8 +329,8 @@ def main(gradebook_input_file,
             print("")
             break
 
-    print("[i] Updating gradebook (" + gradebook_output_path + ")")
-    book.write_grades(gradebook_output_path)
+        print("[i] Updating gradebook (" + gradebook_output_path + ")")
+        book.write_grades(gradebook_output_path)
     if stage_submission is not None and stage_submission == True:
         print("""[i] You can use the following line for moss
         moss.pl -l <lang> """
