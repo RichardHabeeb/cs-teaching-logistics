@@ -10,6 +10,8 @@ import shutil
 import subprocess
 import shlex
 
+PERM_STAGE_DIR_STR = "/stage/"
+
 class Gradebook:
     NET_ID = 'SIS Login ID'
     NAME = 'Student'
@@ -156,7 +158,7 @@ class TestRunner():
         print("\t[i] Late penalty: " + str(late_penalty))
 
 
-    def grade(self, sub_num=None, pause=False):
+    def grade(self, sub_num=None, pause=False, perm_stage=False):
         print("[i] Grading " + self.name +  " (" + self.net_id + ")...")
 
         if not os.path.isdir(self.student_path):
@@ -190,6 +192,10 @@ class TestRunner():
             if self.assignment.do_stage:
                 exec_path = str(temp_dir)
                 self.setup_stage(exec_path)
+                if perm_stage:
+                    perm_stage_path = self.student_path + PERM_STAGE_DIR_STR
+                    print("\t[i] Setting up permanent stage directory in " + perm_stage_path)
+                    self.setup_perm_stage(perm_stage_path)
 
             os.chdir(exec_path)
             print("\t[i] Executing from ", exec_path)
@@ -228,6 +234,10 @@ class TestRunner():
         if result == "n":
             os.chdir(original_working_dir)
             return None
+
+    def setup_perm_stage(self, exec_path):
+        shutil.copytree(self.latest_submission_path, exec_path,
+                ignore=self.assignment.stage_ignore_patterns, dirs_exist_ok=True)
 
     def setup_stage(self, exec_path):
         shutil.copytree(self.latest_submission_path, exec_path,
@@ -280,7 +290,8 @@ def main(gradebook_input_file,
          submission_to_grade,
          skip_graded,
          late_info,
-         pause_before_running):
+         pause_before_running,
+         stage_submission):
     print("######################################################################")
     print("#                         AUTO GRADER                                #")
     print("######################################################################")
@@ -311,7 +322,7 @@ def main(gradebook_input_file,
 
         try:
             book.set_grade(student, assignment,
-                    runner.grade(submission_to_grade, pause_before_running))
+                    runner.grade(submission_to_grade, pause_before_running, stage_submission))
         except KeyboardInterrupt:
             os.chdir(original_working_dir)
             book.write_grades(gradebook_output_path)
@@ -320,7 +331,13 @@ def main(gradebook_input_file,
 
         print("[i] Updating gradebook (" + gradebook_output_path + ")")
         book.write_grades(gradebook_output_path)
-
+    if stage_submission is not None and stage_submission == True:
+        print("""[i] You can use the following line for moss
+        moss.pl -l <lang> """
+        + ("" if assignment.stage_template is None else "-b " + assignment.stage_template + "/*")
+        + " -d "
+        + assignment.submit_path
+        + "*/stage/*")
 
 
 
@@ -334,6 +351,9 @@ if __name__ == "__main__":
     parser.add_argument("--skip_graded", action="store_true", help="Skip grading students that already have a grade")
     parser.add_argument("--late_info", action="store_true", help="Just show the late deductions")
     parser.add_argument("--pause", action="store_true", help="Pause before starting to execute user code")
+    parser.add_argument("--stage_submission", action="store_true", help="""
+            Prepare a staging directory for the latest valid submission under <submit path>/<netid>/stage/
+            Can be useful to run plagiarism tester. Not deleted after script finishes""")
     #parser.add_argument("--students", type=str, help="Grade a list of netids")
     #parser.add_argument("--skip", help="Don't grade these students")
 
@@ -347,4 +367,5 @@ if __name__ == "__main__":
         args.submission,
         args.skip_graded,
         args.late_info,
-        args.pause)
+        args.pause,
+        args.stage_submission)
