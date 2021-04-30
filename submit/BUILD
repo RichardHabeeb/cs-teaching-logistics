@@ -31,7 +31,7 @@ cc_binary(
         "submit.cpp",
     ],
     defines = [
-        "SUBMIT_LIST=STR(kernel.c),STR(kernel.h),STR(k-loader.c)",
+        "SUBMIT_SINGLE=process.c",
         "TARGET_DIR=/c/cs323/proj4/.submit",
         "GET_DIR_PREFIX=/home/accts",
     ],
@@ -44,8 +44,8 @@ cc_binary(
         "submit.cpp",
     ],
     defines = [
-        "SUBMIT_SINGLE=abash_process.c",
-        "TARGET_DIR=/c/cs323/proj5/.submit",
+        "SUBMIT_LIST=STR(kernel.c),STR(kernel.h),STR(k-loader.c)",
+        "TARGET_DIR=/c/cs323/proj4/.submit",
         "GET_DIR_PREFIX=/home/accts",
     ],
 )
