@@ -50,8 +50,6 @@ print "Each test is either passed or failed; there is no partial credit.\n\n"
 sub cleanupTesting {
     if ($TYPE eq "Final") {
        print "\n";
-       system ("rm -f $PROGRAM *.o")                # Cleanup if final script
-          unless ($LANG eq "Perl");
     }
 
     if ($TYPE eq "Public") {                        # Reminder to students

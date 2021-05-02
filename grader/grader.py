@@ -11,7 +11,7 @@ import subprocess
 import shlex
 import multiprocessing
 
-PERM_STAGE_DIR_STR = "/stage/"
+PERM_STAGE_DIR_STR = "stage/"
 
 
 class Utility:
@@ -161,13 +161,14 @@ class Assignment():
 
 class TestRunner():
 
-    def __init__(self, assignment, net_id, name, sub_num, dry_run, perm_stage, pause, quiet, do_correction_grade):
+    def __init__(self, assignment, net_id, name, sub_num, dry_run, perm_stage, perm_stage_only, pause, quiet, do_correction_grade):
         self.assignment = assignment
         self.net_id = net_id
         self.name = name
         self.student_path = os.path.join(self.assignment.submit_path, self.net_id)
         self.dry_run = dry_run
         self.perm_stage = perm_stage
+        self.perm_stage_only = perm_stage
         self.pause = pause
         self.quiet = quiet
         self.output_log = ""
@@ -237,10 +238,14 @@ class TestRunner():
         #each opens in appending mode, so we first delete any previous content
         log_path = os.path.join(self.assignment.output_path,
             self.net_id + "-" + str(self.latest_submission_num) + ".txt")
-        with open(log_path, "wb") as log:
-            log.truncate()
+
+        if not self.perm_stage_only:
+            with open(log_path, "wb") as log:
+                log.truncate()
 
         std_raw_score, std_extra_credit = self.execute(self.latest_submission_path, log_path)
+
+
         self.print("\t[i] Raw Score: " + str(std_raw_score))
         self.print("\t[i] Extra Credit: " + str(std_extra_credit))
 
@@ -257,9 +262,13 @@ class TestRunner():
 
             cor_weight = self.assignment.get_corrections_weight(self.net_id)
 
+        if self.perm_stage_only:
+            return None
+
         self.correction_bonus = max(0, (cor_raw_score - std_raw_score) * cor_weight)
         self.score = max(0, (std_raw_score - self.late_penalty) + self.correction_bonus)
         self.extra_credit = max(0, std_extra_credit + cor_extra_credit * cor_weight)
+
 
         self.print("\t[i] Total Score (lateness adjusted, no ec): " + str(self.score))
         self.print("\t[i] Total Extra Credit: " + str(self.extra_credit))
@@ -277,8 +286,10 @@ class TestRunner():
             os.chdir(original_working_dir)
             return None
 
-    def setup_perm_stage(self, exec_path):
-        shutil.copytree(self.latest_submission_path, exec_path,
+    def setup_perm_stage(self, src_path):
+        perm_stage_path = os.path.join(self.student_path, PERM_STAGE_DIR_STR)
+        self.print("\t[i] Setting up permanent stage directory in " + str(perm_stage_path))
+        shutil.copytree(src_path, perm_stage_path,
                 ignore=self.assignment.get_ignore_patterns_func(), dirs_exist_ok=True)
 
     def setup_stage(self, src_path, exec_path):
@@ -299,10 +310,10 @@ class TestRunner():
                 exec_path = str(temp_dir)
                 self.setup_stage(src_path, exec_path)
                 if self.perm_stage:
-                    #TODO corrections MOSS checking?
-                    perm_stage_path = self.student_path + PERM_STAGE_DIR_STR
-                    self.print("\t[i] Setting up permanent stage directory in " + perm_stage_path)
-                    self.setup_perm_stage(perm_stage_path)
+                    self.setup_perm_stage(src_path)
+
+            if self.perm_stage_only:
+                return (None, None)
 
             os.chdir(exec_path)
             self.print("\t[i] Executing from " + str(exec_path))
@@ -383,6 +394,7 @@ def main(gradebook_input_file,
          late_info,
          pause_before_running,
          stage_submission,
+         stage_submission_only,
          make_dry_run,
          pool_size,
          corrections):
@@ -397,6 +409,11 @@ def main(gradebook_input_file,
     original_working_dir = os.getcwd()
 
     do_pooling = pool_size is not None and pool_size > 1
+    do_update_grades = not stage_submission_only and not late_info
+    stage_submission = stage_submission or stage_submission_only
+
+    if do_update_grades and (gradebook_output_path is None or len(gradebook_output_path) == 0):
+        raise("No gradebook output defined with -o flag")
 
     runners = []
 
@@ -412,9 +429,10 @@ def main(gradebook_input_file,
             continue
 
         runners.append(TestRunner(assignment, student, book.name(student),
-                submission_to_grade, make_dry_run, pause_before_running, stage_submission, do_pooling, corrections))
+                submission_to_grade, make_dry_run, stage_submission,
+                stage_submission_only, pause_before_running, do_pooling, corrections))
 
-    print("[i] Grading " + str(len(runners)) + " students based on selected options.")
+    print("[i] Processing " + str(len(runners)) + " students based on selected options.")
 
 
     if do_pooling:
@@ -435,9 +453,11 @@ def main(gradebook_input_file,
                 os.chdir(original_working_dir)
                 break
             finally:
-                book.write_grades(gradebook_output_path)
+                if do_update_grades:
+                    book.write_grades(gradebook_output_path)
 
-    book.write_grades(gradebook_output_path)
+    if do_update_grades:
+        book.write_grades(gradebook_output_path)
 
     if stage_submission is not None and stage_submission == True:
         print("""[i] You can use the following line for moss
@@ -453,7 +473,13 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("gradebook", help="Canvas exported gradebook CSV file")
     parser.add_argument("config", help="Assignment config json file")
-    parser.add_argument("output_gradebook", help="Path for where to create the final gradebook")
+
+    group0 = parser.add_mutually_exclusive_group()
+    group0.add_argument("-o", "--output_gradebook", help="Path for where to create the final gradebook")
+    group0.add_argument("--stage_submission_only", action="store_true", help="Same as --stage_submission, but no tests are run. No gradebook updates performed.")
+    group0.add_argument("--late_info", action="store_true", help="Just show the late deductions. Doesn't output any grades.")
+
+
     parser.add_argument("--student", type=str, help="Grade a specific student (netid)")
     parser.add_argument("--submission", type=int, help="Grade a specific submission number")
     parser.add_argument("--skip_graded", action="store_true", help="Skip grading students that already have a grade")
@@ -466,7 +492,6 @@ if __name__ == "__main__":
     group2.add_argument("--pause", action="store_true", help="Pause before starting to execute user code")
     group2.add_argument("--pool_size", type=int, help="Run multiple students at once (must have non-interactive phases), no intermediate grade-book saving!")
 
-    parser.add_argument("--late_info", action="store_true", help="Just show the late deductions")
     parser.add_argument("--stage_submission", action="store_true", help="""
             Prepare a staging directory for the latest valid submission under <submit path>/<netid>/stage/
             Can be useful to run plagiarism tester. Not deleted after script finishes""")
@@ -485,6 +510,7 @@ if __name__ == "__main__":
         args.late_info,
         args.pause,
         args.stage_submission,
+        args.stage_submission_only,
         args.make_dry_run,
         args.pool_size,
         args.corrections)
