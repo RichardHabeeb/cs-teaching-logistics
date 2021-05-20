@@ -437,7 +437,7 @@ def main(gradebook_input_file,
 
     if do_pooling:
         with multiprocessing.Pool(pool_size) as process_pool:
-                completed_runners = process_pool.map(pooled_grader, runners)
+            completed_runners = process_pool.map(pooled_grader, runners)
 
         for completed in completed_runners:
             book.set_grade(completed.net_id, assignment, completed.score)
