@@ -438,6 +438,8 @@ def main(gradebook_input_file,
     if do_pooling:
         with multiprocessing.Pool(pool_size) as process_pool:
             completed_runners = process_pool.map(pooled_grader, runners)
+            process_pool.close()  # stop more tasks from being added
+            process_pool.join()  # wait for all workers to complete before moving on
 
         for completed in completed_runners:
             book.set_grade(completed.net_id, assignment, completed.score)
