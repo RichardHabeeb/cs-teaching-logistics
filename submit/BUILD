@@ -12,13 +12,26 @@ cc_binary(
 )
 
 cc_binary(
-    name = "submit-2",
+    name = "submit-dmalloc",
     deps = [],
     srcs = [
         "submit.cpp",
     ],
     defines = [
         "SUBMIT_SINGLE=dmalloc.cc",
+        "TARGET_DIR=/c/cs323/proj2/.submit",
+        "GET_DIR_PREFIX=/home/accts",
+    ],
+)
+
+cc_binary(
+    name = "submit-obj2exec",
+    deps = [],
+    srcs = [
+        "submit.cpp",
+    ],
+    defines = [
+        "SUBMIT_SINGLE=obj2exec.cpp",
         "TARGET_DIR=/c/cs323/proj2/.submit",
         "GET_DIR_PREFIX=/home/accts",
     ],
