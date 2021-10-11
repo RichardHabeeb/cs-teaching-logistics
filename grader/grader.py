@@ -274,6 +274,8 @@ class TestRunner():
         self.print("\t[i] Total Extra Credit: " + str(self.extra_credit))
         self.print("\t[i] Log file: " + str(log_path))
 
+        self.write_log_footer(log_path)
+
         return self.score
 
     def make_dry_run(self):
@@ -298,6 +300,15 @@ class TestRunner():
         # Copy template last, intentionally overwriting any submitted template files
         if self.assignment.stage_template is not None:
             shutil.copytree(self.assignment.stage_template, exec_path, dirs_exist_ok=True)
+
+    def write_log_footer(self, log_path):
+        with open(log_path, "a") as f:
+            f.write("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n")
+            f.write("Late Penalty: " + str(self.late_penalty) + "\n")
+            f.write("Total Score (lateness adjusted):" + str(self.score) + "\n")
+            f.write("Extra Credit: " + str(self.extra_credit) + "\n")
+            f.write("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n")
+
 
     def execute(self, src_path, log_path):
         extra_credit_score = 0
@@ -388,7 +399,7 @@ def pooled_grader(test_runner):
 def main(gradebook_input_file,
          gradebook_output_path,
          assignment_config_file,
-         student_to_grade,
+         students_to_grade,
          submission_to_grade,
          skip_graded,
          late_info,
@@ -417,8 +428,13 @@ def main(gradebook_input_file,
 
     runners = []
 
+    student_whitelist = None
+    if students_to_grade is not None and len(students_to_grade) > 0:
+        student_whitelist = [s.strip() for s in args.students.split(",")]
+
+
     for student in book:
-        if student_to_grade is not None and len(student_to_grade) > 0 and student != student_to_grade:
+        if student_whitelist is not None and student not in student_whitelist:
             continue
 
         if skip_graded and book.has_grade(student, assignment):
@@ -482,7 +498,6 @@ if __name__ == "__main__":
     group0.add_argument("--late_info", action="store_true", help="Just show the late deductions. Doesn't output any grades.")
 
 
-    parser.add_argument("--student", type=str, help="Grade a specific student (netid)")
     parser.add_argument("--submission", type=int, help="Grade a specific submission number")
     parser.add_argument("--skip_graded", action="store_true", help="Skip grading students that already have a grade")
 
@@ -497,8 +512,9 @@ if __name__ == "__main__":
     parser.add_argument("--stage_submission", action="store_true", help="""
             Prepare a staging directory for the latest valid submission under <submit path>/<netid>/stage/
             Can be useful to run plagiarism tester. Not deleted after script finishes""")
-    #parser.add_argument("--students", type=str, help="Grade a list of netids")
+    parser.add_argument("--students", type=str, help="Grade a list of netids: \"netID, netID, ...\"")
     #parser.add_argument("--skip", help="Don't grade these students")
+
 
 
     args = parser.parse_args()
@@ -506,7 +522,7 @@ if __name__ == "__main__":
         args.gradebook,
         args.output_gradebook,
         args.config,
-        args.student,
+        args.students,
         args.submission,
         args.skip_graded,
         args.late_info,

@@ -19,7 +19,7 @@ cc_binary(
     ],
     defines = [
         "SUBMIT_SINGLE=dmalloc.cc",
-        "TARGET_DIR=/c/cs323/proj2/.submit",
+        "TARGET_DIR=/c/cs323/proj2/.submit-dmalloc",
         "GET_DIR_PREFIX=/home/accts",
     ],
 )
@@ -32,7 +32,7 @@ cc_binary(
     ],
     defines = [
         "SUBMIT_SINGLE=obj2exec.cpp",
-        "TARGET_DIR=/c/cs323/proj2/.submit",
+        "TARGET_DIR=/c/cs323/proj2/.submit-obj2exec",
         "GET_DIR_PREFIX=/home/accts",
     ],
 )

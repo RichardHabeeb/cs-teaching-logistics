@@ -1,5 +1,5 @@
 #sometimes ccache messes up on the zoo, and this needs to be uncommented
-#export CC="/usr/bin/gcc"
+export CC="/usr/bin/gcc"
 
 echo "Building submit"
 bazel build //submit:all
