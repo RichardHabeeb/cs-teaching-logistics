@@ -9,13 +9,23 @@ cc_binary(
     ],
 )
 cc_binary(
-    name = "results-2",
+    name = "results-2-dmalloc",
     deps = [],
     srcs = [
         "results.cpp",
     ],
     defines = [
-        "RESULTS_PATH=/c/cs323/proj2/.result"
+        "RESULTS_PATH=/c/cs323/proj2/.result-dmalloc"
+    ],
+)
+cc_binary(
+    name = "results-2-obj2exec",
+    deps = [],
+    srcs = [
+        "results.cpp",
+    ],
+    defines = [
+        "RESULTS_PATH=/c/cs323/proj2/.result-obj2exec"
     ],
 )
 cc_binary(

@@ -66,6 +66,8 @@ class Gradebook:
         return self.net_id_map[net_id][assignment.gradebook_name]
 
     def set_grade(self, net_id, assignment, score):
+        if assignment.gradebook_name not in self.net_id_map[net_id]:
+            raise Exception("Assignment name not in gradebook (check the number)")
         self.net_id_map[net_id][assignment.gradebook_name] = score
 
     def has_grade(self, net_id, assignment):
@@ -161,7 +163,7 @@ class Assignment():
 
 class TestRunner():
 
-    def __init__(self, assignment, net_id, name, sub_num, dry_run, perm_stage, perm_stage_only, pause, quiet, do_correction_grade):
+    def __init__(self, assignment, net_id, name, sub_num, dry_run, perm_stage, perm_stage_only, pause, quiet, do_correction_grade, no_results):
         self.assignment = assignment
         self.net_id = net_id
         self.name = name
@@ -173,6 +175,7 @@ class TestRunner():
         self.quiet = quiet
         self.output_log = ""
         self.do_correction_grade = do_correction_grade
+        self.no_results = no_results
 
         self.latest_submission_path = None
         self.latest_submission_num = None
@@ -236,10 +239,12 @@ class TestRunner():
 
         #create one log file used for both executions
         #each opens in appending mode, so we first delete any previous content
-        log_path = os.path.join(self.assignment.output_path,
+
+        log_path = "/dev/null" if self.no_results else os.path.join(self.assignment.output_path,
             self.net_id + "-" + str(self.latest_submission_num) + ".txt")
 
-        if not self.perm_stage_only:
+
+        if not self.perm_stage_only and not self.no_results:
             with open(log_path, "wb") as log:
                 log.truncate()
 
@@ -408,7 +413,8 @@ def main(gradebook_input_file,
          stage_submission_only,
          make_dry_run,
          pool_size,
-         corrections):
+         corrections,
+         no_results):
     print("######################################################################")
     print("#                         AUTO GRADER                                #")
     print("######################################################################")
@@ -440,13 +446,10 @@ def main(gradebook_input_file,
         if skip_graded and book.has_grade(student, assignment):
             continue
 
-        if late_info:
-            runner.print_late_info()
-            continue
-
         runners.append(TestRunner(assignment, student, book.name(student),
                 submission_to_grade, make_dry_run, stage_submission,
-                stage_submission_only, pause_before_running, do_pooling, corrections))
+                stage_submission_only, pause_before_running, do_pooling, corrections,
+                no_results))
 
     print("[i] Processing " + str(len(runners)) + " students based on selected options.")
 
@@ -463,6 +466,10 @@ def main(gradebook_input_file,
         progress = 0
         for runner in runners:
             print("[i] Progress: ", progress * 100.0 / len(runners))
+            if late_info:
+                runner.print_late_info()
+                continue
+
             try:
                 runner.grade()
                 book.set_grade(runner.net_id, assignment, runner.score)
@@ -513,6 +520,9 @@ if __name__ == "__main__":
             Prepare a staging directory for the latest valid submission under <submit path>/<netid>/stage/
             Can be useful to run plagiarism tester. Not deleted after script finishes""")
     parser.add_argument("--students", type=str, help="Grade a list of netids: \"netID, netID, ...\"")
+
+    parser.add_argument("--no_results", action="store_true", help="Don't create or update a results text file")
+
     #parser.add_argument("--skip", help="Don't grade these students")
 
 
@@ -531,4 +541,5 @@ if __name__ == "__main__":
         args.stage_submission_only,
         args.make_dry_run,
         args.pool_size,
-        args.corrections)
+        args.corrections,
+        args.no_results)
