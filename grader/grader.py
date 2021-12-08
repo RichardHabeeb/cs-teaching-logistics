@@ -148,7 +148,8 @@ class Assignment():
             return 0
 
         due = self.get_student_fudged_timestamp(net_id, "due_date")
-        submitted = datetime.datetime.fromtimestamp(Utility.latest_file_date_in_path(path))
+        submitted = datetime.datetime.fromtimestamp(
+                Utility.latest_file_date_in_path(path))
 
         if submitted is None:
             return 0
@@ -163,10 +164,13 @@ class Assignment():
 
 class TestRunner():
 
-    def __init__(self, assignment, net_id, name, sub_num, dry_run, perm_stage, perm_stage_only, pause, quiet, do_correction_grade, no_results):
+    def __init__(self, assignment, net_id, name, previous_score, sub_num,
+            dry_run, perm_stage, perm_stage_only, pause, quiet,
+            do_correction_grade, no_results):
         self.assignment = assignment
         self.net_id = net_id
         self.name = name
+        self.previous_score = previous_score
         self.student_path = os.path.join(self.assignment.submit_path, self.net_id)
         self.dry_run = dry_run
         self.perm_stage = perm_stage
@@ -191,6 +195,10 @@ class TestRunner():
         self.latest_correction_num = None
         if self.do_correction_grade:
             self.find_latest_valid_correction()
+
+        self.has_corrections = (
+                self.latest_correction_num is not None and
+                self.latest_submission_num < self.latest_correction_num)
 
         self.score = 0
         self.extra_credit = 0
@@ -234,14 +242,19 @@ class TestRunner():
             self.print("\t[!] No on time submissions.")
             return 0
 
+        if self.do_correction_grade and not self.has_corrections:
+            self.print("\t[!] No corrections submission.")
+            return self.previous_score
+
         self.print("\t[i] Using: " + str(self.latest_submission_path))
         self.print("\t[i] Late penalty: " + str(self.late_penalty))
 
         #create one log file used for both executions
         #each opens in appending mode, so we first delete any previous content
 
-        log_path = "/dev/null" if self.no_results else os.path.join(self.assignment.output_path,
-            self.net_id + "-" + str(self.latest_submission_num) + ".txt")
+        log_path = ("/dev/null" if self.no_results else
+                os.path.join(self.assignment.output_path,
+                    self.net_id + "-" + str(self.latest_submission_num) + ".txt"))
 
 
         if not self.perm_stage_only and not self.no_results:
@@ -258,12 +271,14 @@ class TestRunner():
         cor_raw_score = 0
         cor_extra_credit = 0
         cor_weight = 0
-        if self.do_correction_grade and self.latest_correction_path is not None and self.latest_correction_path != self.latest_submission_path:
+        if self.do_correction_grade and self.has_corrections:
             self.print("\t[i] Using corrections: " + str(self.latest_correction_path))
             cor_raw_score, cor_extra_credit = self.execute(self.latest_correction_path, log_path)
 
-            self.print("\t[i] Raw Corrections Improvement: " + str(cor_raw_score - std_raw_score))
-            self.print("\t[i] Raw Corrections Extra Credit Improvement: " + str(cor_extra_credit - std_extra_credit))
+            self.print("\t[i] Raw Corrections Improvement: " +
+                    str(cor_raw_score - std_raw_score))
+            self.print("\t[i] Raw Corrections Extra Credit Improvement: " +
+                    str(cor_extra_credit - std_extra_credit))
 
             cor_weight = self.assignment.get_corrections_weight(self.net_id)
 
@@ -277,6 +292,7 @@ class TestRunner():
 
         self.print("\t[i] Total Score (lateness adjusted, no ec): " + str(self.score))
         self.print("\t[i] Total Extra Credit: " + str(self.extra_credit))
+        self.print("\t[i] Previous Score: " + str(self.previous_score))
         self.print("\t[i] Log file: " + str(log_path))
 
         self.write_log_footer(log_path)
@@ -443,13 +459,17 @@ def main(gradebook_input_file,
         if student_whitelist is not None and student not in student_whitelist:
             continue
 
+
         if skip_graded and book.has_grade(student, assignment):
             continue
 
+        current_grade = (book.get_grade(student, assignment) if
+                book.has_grade(student, assignment) else 0)
+
         runners.append(TestRunner(assignment, student, book.name(student),
-                submission_to_grade, make_dry_run, stage_submission,
-                stage_submission_only, pause_before_running, do_pooling, corrections,
-                no_results))
+                current_grade, submission_to_grade, make_dry_run,
+                stage_submission, stage_submission_only, pause_before_running,
+                do_pooling, corrections, no_results))
 
     print("[i] Processing " + str(len(runners)) + " students based on selected options.")
 
