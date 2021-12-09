@@ -197,8 +197,9 @@ class TestRunner():
             self.find_latest_valid_correction()
 
         self.has_corrections = (
-                self.latest_correction_num is not None and
-                self.latest_submission_num < self.latest_correction_num)
+                self.latest_correction_num is not None and (
+                self.latest_submission_num is None or
+                self.latest_submission_num < self.latest_correction_num))
 
         self.score = 0
         self.extra_credit = 0
@@ -244,6 +245,7 @@ class TestRunner():
 
         if self.do_correction_grade and not self.has_corrections:
             self.print("\t[!] No corrections submission.")
+            self.score = self.previous_score
             return self.previous_score
 
         self.print("\t[i] Using: " + str(self.latest_submission_path))
