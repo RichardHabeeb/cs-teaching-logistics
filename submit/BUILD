@@ -58,7 +58,7 @@ cc_binary(
     ],
     defines = [
         "SUBMIT_LIST=STR(kernel.c),STR(kernel.h),STR(k-loader.c)",
-        "TARGET_DIR=/c/cs323/proj4/.submit",
+        "TARGET_DIR=/c/cs323/proj5/.submit",
         "GET_DIR_PREFIX=/home/accts",
     ],
 )

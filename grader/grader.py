@@ -359,7 +359,7 @@ class TestRunner():
                 input("\t[?] Press enter to run commands.")
 
             self.print("\t[i] Running commands...")
-            with open(log_path, "ab") as f:
+            with open(log_path, "a") as f:
                 for phase in self.assignment.execution:
                     if "extra_credit" in phase and phase["extra_credit"]:
                         extra_credit_score += self.execute_phase(phase, f)
@@ -371,24 +371,44 @@ class TestRunner():
         return (score, extra_credit_score)
 
     def execute_phase(self, phase, log_file):
-        log_file.write(b"######################################################################\n")
+        log_file.write("######################################################################\n")
+        log_file.write("# Begin Testing Phase: " + phase["name"] + "\n")
+        log_file.write("######################################################################\n")
         self.print("\t\t[i] Phase: " + phase["name"])
+
+        phase_num = 1
+
         phase_score = 0.0
         for c in phase["cmds"]:
             self.print("\t\t\t[$] " + c)
             command_pipe = subprocess.Popen(shlex.split(c), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             (command_stdout, command_stderr) = command_pipe.communicate()
 
-            log_file.write(b"### STDOUT ##########################\n")
-            log_file.write(command_stdout)
-            log_file.write(b"### STDERR ##########################\n")
-            log_file.write(command_stderr)
+            if len(command_stdout) > 0:
+                log_file.write("\n\n### STDOUT (test command " +
+                        str(phase_num) + "/" + str(len(phase["cmds"])) +
+                            ") ##########################\n")
+                log_file.write(command_stdout.decode("utf-8"))
+
+
+            if len(command_stderr) > 0:
+                log_file.write("\n\n### STDERR (test command " +
+                        str(phase_num) + "/" + str(len(phase["cmds"])) +
+                            ") ##########################\n")
+                log_file.write(command_stderr.decode("utf-8"))
+
             command_score = command_pipe.wait()
             self.print("\t\t\t\t[i] " + str(command_score) + " point(s)")
             phase_score += command_score
+            phase_num += 1
 
         phase_score_scaled = (phase_score / phase["max"])*self.assignment.total_points*phase["weight"]
         self.print("\t\t\t[i] Phase score: " + str(phase_score_scaled))
+
+        log_file.write("######################################################################\n")
+        log_file.write("# Completed Testing: " + phase["name"] + "\n")
+        log_file.write("# " + str(phase_score_scaled) + "/" + str(self.assignment.total_points*phase["weight"]) + "\n")
+        log_file.write("######################################################################\n\n")
         return phase_score_scaled
 
 
