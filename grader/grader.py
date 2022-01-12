@@ -12,7 +12,20 @@ import shlex
 import multiprocessing
 
 PERM_STAGE_DIR_STR = "stage/"
+SUPPORTED_LATE_POLICIES = [
+    "percent_per_day",
+    "late_day_counter",
+]
+DEFAULT_LATE_POLICY = "percent_per_day"
 
+UNTRIMMABLE_CSV_COLUMNS = [
+    "Student",
+    "ID",
+    "SIS User ID",
+    "SIS Login ID",
+    "Root Account",
+    "Section",
+]
 
 class Utility:
     def number_of_files_in_path(path):
@@ -33,7 +46,7 @@ class Gradebook:
     NET_ID = 'SIS Login ID'
     NAME = 'Student'
 
-    def __init__(self, csv_file):
+    def __init__(self, csv_file, trim):
         self.ignored_net_ids = [
                 "",
                 "e507bbac9fdc6d660897785054f8ebe1f9585df8",
@@ -43,6 +56,10 @@ class Gradebook:
         self.reader = csv.DictReader(self.csv_file)
         self.fieldnames = self.reader.fieldnames
         self.net_id_map = {}
+        self.updated_net_ids = []
+        self.updated_cols = []
+        self.trim = trim
+
         for row in self.reader:
             net_id = row[Gradebook.NET_ID]
             if net_id not in self.ignored_net_ids:
@@ -62,24 +79,49 @@ class Gradebook:
     def name(self, net_id):
         return self.net_id_map[net_id][Gradebook.NAME]
 
+    def match_gradebook_fieldname(self, fieldname):
+        for col in self.fieldnames:
+            if fieldname in col:
+                return col
+        raise Exception("Field name not in gradebook")
+
     def get_grade(self, net_id, assignment):
-        return self.net_id_map[net_id][assignment.gradebook_name]
+        fieldname = self.match_gradebook_fieldname(assignment.gradebook_name)
+        return self.net_id_map[net_id][fieldname]
 
     def set_grade(self, net_id, assignment, score):
-        if assignment.gradebook_name not in self.net_id_map[net_id]:
-            raise Exception("Assignment name not in gradebook (check the number)")
-        self.net_id_map[net_id][assignment.gradebook_name] = score
+        fieldname = self.match_gradebook_fieldname(assignment.gradebook_name)
+        self.updated_cols.append(fieldname)
+        self.updated_net_ids.append(net_id)
+        self.net_id_map[net_id][fieldname] = score
 
     def has_grade(self, net_id, assignment):
-        val = self.net_id_map[net_id][assignment.gradebook_name]
+        fieldname = self.match_gradebook_fieldname(assignment.gradebook_name)
+        val = self.net_id_map[net_id][fieldname]
         return val is not None and len(str(val)) > 0
+
+    def set_late_days(self, net_id, assignment, days):
+        if assignment.gradebook_late_days is not None:
+            fieldname = self.match_gradebook_fieldname(assignment.gradebook_late_days)
+            self.updated_cols.append(fieldname)
+            self.net_id_map[net_id][fieldname] = days
 
     def write_grades(self, output_file):
         with open(output_file, "w+") as out_f:
-            writer = csv.DictWriter(out_f, self.fieldnames)
+            cols_to_delete = []
+            if self.trim:
+                for field in self.fieldnames:
+                    if not (field in self.updated_cols or
+                            field in UNTRIMMABLE_CSV_COLUMNS):
+                        cols_to_delete.append(field)
+
+            writer = csv.DictWriter(out_f,
+                    [c for c in self.fieldnames if c not in cols_to_delete])
             writer.writeheader()
-            for row in self.net_id_map.values():
-                writer.writerow(row)
+            for net_id, row in self.net_id_map.items():
+                if not self.trim or net_id in self.updated_net_ids:
+                    writer.writerow(dict((k,v) for k,v in row.items()
+                                        if k not in cols_to_delete))
 
     def __del__(self):
         self.csv_file.close()
@@ -101,6 +143,19 @@ class Assignment():
         self.submit_path = config["submit_path"]
         self.output_path = config["output_path"]
         self.execution = config["execution_phases"]
+
+        self.gradebook_late_days = (config["canvas_gradebook_late_days"]
+                if "canvas_gradebook_late_days" in config else None)
+
+        if "late_policy" not in config:
+            self.late_policy = DEFAULT_LATE_POLICY
+        elif config["late_policy"] not in SUPPORTED_LATE_POLICIES:
+            print("[!] Unsupported late policy, using default")
+            self.late_policy = DEFAULT_LATE_POLICY
+        else:
+            self.late_policy = config["late_policy"]
+
+
         self.do_stage = "stage" in config
         if self.do_stage:
             self.stage_template = (None if "template_dir" not in config["stage"]
@@ -143,10 +198,7 @@ class Assignment():
         return submitted is None or submitted <= close
 
 
-    def get_late_deduction(self, net_id, path):
-        if not os.path.isdir(path):
-            return 0
-
+    def get_late_days(self, net_id, path):
         due = self.get_student_fudged_timestamp(net_id, "due_date")
         submitted = datetime.datetime.fromtimestamp(
                 Utility.latest_file_date_in_path(path))
@@ -154,8 +206,18 @@ class Assignment():
         if submitted is None:
             return 0
 
+        return max(0, ((submitted-due).total_seconds()//(24*60*60) + 1))
+
+
+    def get_late_deduction(self, net_id, path):
+        if self.late_policy == "late_days_counter":
+            return 0
+
+        if not os.path.isdir(path):
+            return 0
+
         return max(0, self.total_points *
-                      ((submitted-due).total_seconds()//(24*60*60) + 1) *
+                      self.get_late_days(net_id, path) *
                       self.get_student_late_percent(net_id) / 100.0)
 
     def get_corrections_weight(self, net_id):
@@ -207,6 +269,7 @@ class TestRunner():
         self.late_penalty = 0
 
         if self.latest_submission_path is not None:
+            self.late_days = self.assignment.get_late_days(self.net_id, self.latest_submission_path)
             self.late_penalty = self.assignment.get_late_deduction(self.net_id, self.latest_submission_path)
 
 
@@ -229,6 +292,7 @@ class TestRunner():
             return
 
         print("\t[i] Using:", self.latest_submission_path)
+        print("\t[i] Late days: " + str(self.late_days))
         print("\t[i] Late penalty: " + str(self.late_penalty))
 
 
@@ -292,6 +356,7 @@ class TestRunner():
         self.extra_credit = max(0, std_extra_credit + cor_extra_credit * cor_weight)
 
 
+        self.print("\t[i] Late days: " + str(self.late_days))
         self.print("\t[i] Total Score (lateness adjusted, no ec): " + str(self.score))
         self.print("\t[i] Total Extra Credit: " + str(self.extra_credit))
         self.print("\t[i] Previous Score: " + str(self.previous_score))
@@ -452,12 +517,13 @@ def main(gradebook_input_file,
          make_dry_run,
          pool_size,
          corrections,
-         no_results):
+         no_results,
+         trim_gradebook):
     print("######################################################################")
     print("#                         AUTO GRADER                                #")
     print("######################################################################")
 
-    book = Gradebook(gradebook_input_file)
+    book = Gradebook(gradebook_input_file, trim_gradebook)
     print("[i] Found " + str(len(book)) + " students.")
 
     assignment = Assignment(assignment_config_file)
@@ -504,6 +570,7 @@ def main(gradebook_input_file,
 
         for completed in completed_runners:
             book.set_grade(completed.net_id, assignment, completed.score)
+            book.set_late_days(completed.net_id, assignment, completed.late_days)
     else:
         progress = 0
         for runner in runners:
@@ -515,6 +582,7 @@ def main(gradebook_input_file,
             try:
                 runner.grade()
                 book.set_grade(runner.net_id, assignment, runner.score)
+                book.set_late_days(runner.net_id, assignment, runner.late_days)
                 progress += 1
             except KeyboardInterrupt:
                 os.chdir(original_working_dir)
@@ -565,6 +633,7 @@ if __name__ == "__main__":
 
     parser.add_argument("--no_results", action="store_true", help="Don't create or update a results text file")
 
+    parser.add_argument("--trim", action="store_true", help="Remove irrelevant columns and rows from the output")
     #parser.add_argument("--skip", help="Don't grade these students")
 
 
@@ -584,4 +653,5 @@ if __name__ == "__main__":
         args.make_dry_run,
         args.pool_size,
         args.corrections,
-        args.no_results)
+        args.no_results,
+        args.trim)
