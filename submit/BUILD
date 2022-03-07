@@ -5,34 +5,8 @@ cc_binary(
         "submit.cpp",
     ],
     defines = [
-        "SUBMIT_ALL",
+        "SUBMIT_LIST=STR(Makefile),STR(proj1.c),STR(proj1.h)",
         "TARGET_DIR=/c/cs323/proj1/.submit",
-        "GET_DIR_PREFIX=/home/accts",
-    ],
-)
-
-cc_binary(
-    name = "submit-dmalloc",
-    deps = [],
-    srcs = [
-        "submit.cpp",
-    ],
-    defines = [
-        "SUBMIT_SINGLE=dmalloc.cc",
-        "TARGET_DIR=/c/cs323/proj2/.submit-dmalloc",
-        "GET_DIR_PREFIX=/home/accts",
-    ],
-)
-
-cc_binary(
-    name = "submit-obj2exec",
-    deps = [],
-    srcs = [
-        "submit.cpp",
-    ],
-    defines = [
-        "SUBMIT_SINGLE=obj2exec.cpp",
-        "TARGET_DIR=/c/cs323/proj2/.submit-obj2exec",
         "GET_DIR_PREFIX=/home/accts",
     ],
 )

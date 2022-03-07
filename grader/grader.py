@@ -268,6 +268,8 @@ class TestRunner():
         self.correction_bonus = 0
         self.late_penalty = 0
 
+        self.late_days = 0
+        self.late_penalty = 0
         if self.latest_submission_path is not None:
             self.late_days = self.assignment.get_late_days(self.net_id, self.latest_submission_path)
             self.late_penalty = self.assignment.get_late_deduction(self.net_id, self.latest_submission_path)
@@ -453,14 +455,20 @@ class TestRunner():
                 log_file.write("\n\n### STDOUT (test command " +
                         str(phase_num) + "/" + str(len(phase["cmds"])) +
                             ") ##########################\n")
-                log_file.write(command_stdout.decode("utf-8"))
+                try:
+                   log_file.write(command_stdout.decode("utf-8"))
+                except UnicodeDecodeError:
+                    self.print("\t\t\t[!] Standard out contains binary characters")
 
 
             if len(command_stderr) > 0:
                 log_file.write("\n\n### STDERR (test command " +
                         str(phase_num) + "/" + str(len(phase["cmds"])) +
                             ") ##########################\n")
-                log_file.write(command_stderr.decode("utf-8"))
+                try:
+                   log_file.write(command_stderr.decode("utf-8"))
+                except UnicodeDecodeError:
+                    self.print("\t\t\t[!] Standard error contains binary characters")
 
             command_score = command_pipe.wait()
             self.print("\t\t\t\t[i] " + str(command_score) + " point(s)")
