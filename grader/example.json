@@ -4,6 +4,8 @@
     "total_points" : 100,
     "submit_path" : "/c/cs323/proj3/.submit",
     "output_path" : "/c/cs323/proj3/.result",
+    "late_policy" : "late_day_counter",
+    "canvas_gradebook_late_days" : "Late Days Used for Project 3",
     "make_dry_run" : false,
     "stage" : {
         "ignore_patterns" : ["*.o", "*.out", "*.exe", "*.gch", "*.py", "submit", "*.pl"],
