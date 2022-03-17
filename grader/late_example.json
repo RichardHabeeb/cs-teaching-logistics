@@ -6,8 +6,7 @@
     "output_path" : "/c/cs323/proj3/.result",
     "late_policy" : "late_day_counter",
     "canvas_gradebook_late_days" : "Late Days Used for Project 3",
-    "canvas_gradebook_late_days_already_used" : "Late Days Used for Project 2",
-    "make_dry_run" : true,
+    "make_dry_run" : false,
     "stage" : {
         "ignore_patterns" : ["*.o", "*.out", "*.exe", "*.gch", "*.py", "submit", "*.pl"],
         "template_dir" : "/c/cs323/proj3/.templates/"
@@ -35,14 +34,10 @@
         }
     ],
     "extensions": {
-        "jb3545, rc266, bf365, cmh239, cl2329, nys6, tcv8" : "no_late_day_free",
-        "nsf28, vkg7, jj684, ttj7, wj94, nck28, zjk7, jhk75, bel25, cp922, ss3993, jhy24" : "3_less_day_free",
-        "yaa24, jhk74, dsl57, rm2557, brs55, ezs3, cjy24, wz297" : "2_less_day_free",
-       "jja52, ajb268, rtj5, al2395, pn258, cwn2, sr2265, pds36, bmv6, vw228, awx2, ely4" : "1_less_day_free"
     },
     "due_dates" : {
         "__default__" : {
-            "due_date" : "3/18/2022 12:00 pm",
+            "due_date" : "3/16/2022 12:00 pm",
             "close_date" : "3/18/2022 12:00 pm",
             "fudge_time_mins" : 30,
             "late_percent_per_day" : 0.0
