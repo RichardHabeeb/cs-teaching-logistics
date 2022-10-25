@@ -211,13 +211,15 @@ create_dir_result_t create_dir(const std::string &path) {
     DIR* dir = opendir(path.c_str());
     if (dir) {
         closedir(dir);
-        /* // Fix permissions if necessarry
-        if(chmod(path.c_str(), S_IRWXU | S_IRWXG) == -1) {
+         // Fix permissions if necessarry
+        if(chmod(path.c_str(), S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IWGRP | S_IXGRP) == -1) {
             return create_dir_result_t::fail;
         }
-    */
         return create_dir_result_t::exists;
     } else if (ENOENT == errno && mkdir(path.c_str(), S_IRWXU | S_IRWXG) == 0) {
+        if(chmod(path.c_str(), S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IWGRP | S_IXGRP) == -1) {
+            return create_dir_result_t::fail;
+        }
         return create_dir_result_t::created;
     } else {
         return create_dir_result_t::fail;
