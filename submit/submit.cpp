@@ -441,7 +441,7 @@ int main(int argc, char *argv[]) {
             "[#] Type 'I have not cheated' to confirm: ";
         std::string confirmation;
     std::getline(std::cin, confirmation);
-        if(confirmation != "I have not cheated") {
+        if(confirmation != "I have not cheated" && confirmation != "i have not cheated") {
             std::cout << "[!] You must adhere to the honor policy to submit.\n";
             std::cout << ">>" << confirmation << "<<\n";
             return 1;
